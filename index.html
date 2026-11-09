@@ -744,7 +744,7 @@ mark('Parede e mesa');
 add(new THREE.PlaneGeometry(4.2, 2.6), mat(0xffffff, { map: wallTex, roughness: 0.9, envMapIntensity: 0.15 }), room, 0, 1.3, -0.47);
 // mesa de nogueira com borda arredondada
 rbox(2.6, 0.045, 0.8, 0.012, walnutM, room, 0, 0.7175, -0.08, 4);
-add(new THREE.PlaneGeometry(2.6, 0.7), mat(C.walnutDark, { roughness: 0.7 }), room, 0, 0.35, 0.3195);
+// (a frente da mesa agora é aberta, com gaveteiros e PC embaixo: veja a seção "Chão e embaixo da mesa")
 
 // ---------- pegboard metálico com ferramentas ----------
 mark('Pegboard');
@@ -1443,7 +1443,7 @@ const PCB = group(room, -0.585, 0.8, -0.225); PCB.rotation.set(0.35, 0.1, 0);
   jumper(inG(bb, hx(14), TOPY, hz(122)), inG(bb, hx(19), TOPY, hz(122)), 0xf0c53e, 0.008);
   // cabo USB: sai para a direita e cai pela borda da mesa
   const u = inG(ar, -0.039, Y0 + 0.0055, -0.012);
-  tube([u.toArray(), [u.x + 0.025, 0.004, u.z], toLocal(g, 0.2, 0.7468, 0.28), toLocal(g, 0.26, 0.7448, 0.312), toLocal(g, 0.29, 0.725, 0.332), toLocal(g, 0.3, 0.6, 0.333)], 0.0022, mat(0x1c1c20, { roughness: 0.6 }), g, 40, 8);
+  tube([u.toArray(), [u.x + 0.025, 0.004, u.z], toLocal(g, 0.2, 0.7468, 0.28), toLocal(g, 0.26, 0.7448, 0.312), toLocal(g, 0.29, 0.725, 0.332), toLocal(g, 0.3, 0.64, 0.345), toLocal(g, 0.33, 0.57, 0.35), toLocal(g, 0.37, 0.53, 0.31), toLocal(g, 0.41, 0.515, 0.25), toLocal(g, 0.41, 0.5, 0.21), toLocal(g, 0.41, 0.493, 0.199)]   /* desce pela borda da mesa, passa por cima do PC e termina plugado na porta USB do topo */, 0.0022, mat(0x1c1c20, { roughness: 0.6 }), g, 40, 8);
 })();
 
 // ---------- terceira mão com lupa ----------
@@ -1637,6 +1637,194 @@ pinned(0.468, 1.43, -0.4685, 0.07, 0.09, canvasTex(224, 288, (c, w, h) => {
 })();
 
 // =====================================================================
+// CHÃO, EMBAIXO DA MESA E PAREDE: enchem o que aparece quando a câmera sobe (celular em pé); no computador quase não entram no quadro
+// =====================================================================
+// LEDs do PC gamer: cada item é [material ou luz, deslocamento de cor]; rgbTick() gira a cor com o tempo
+const rgbLeds = [], rgbLights = [];
+const rgbTick = (t) => { const hu = (t * 0.00007) % 1; rgbLeds.forEach(([m, o]) => m.color.setHSL((hu + o) % 1, 1, 0.55)); rgbLights.forEach(([l, o]) => l.color.setHSL((hu + o) % 1, 1, 0.55)); };
+mark('Chão e embaixo da mesa');
+(() => {
+  const dk = mat(C.walnutDark, { roughness: 0.7 }), body = mat(0x2b2c31, { roughness: 0.55, metalness: 0.15 }), front = mat(0x3a3d45, { roughness: 0.5, metalness: 0.1 }), st = mat(C.steel, METAL);
+  // chão de tábuas escuras, da parede até bem à frente da mesa
+  const ft = woodTex('#2a2018'); ft.repeat.set(5, 4);
+  add(new THREE.PlaneGeometry(8, 6), mat(0xffffff, { map: ft, roughness: 0.55, envMapIntensity: 0.2 }), room, 0, 0, 2.53).rotation.x = -Math.PI / 2;
+  // laterais da mesa e dois gaveteiros com puxadores e etiquetas
+  [-1, 1].forEach((s) => rbox(0.03, 0.695, 0.76, 0.004, dk, room, s * 1.285, 0.3475, -0.09, 2));
+  const unit = (x, n, labels) => {
+    const g = group(room, x, 0, -0.08), H = 0.64, gap = 0.012, dh = (H - 0.03 - gap * (n - 1)) / n;
+    rbox(0.62, H, 0.74, 0.006, body, g, 0, 0.03 + H / 2, 0, 2);
+    for (let i = 0; i < n; i++) {
+      const y = 0.03 + 0.015 + dh / 2 + i * (dh + gap);
+      rbox(0.58, dh, 0.014, 0.004, front, g, 0, y, 0.372, 2);
+      rbox(0.2, 0.012, 0.016, 0.005, st, g, 0, y + dh * 0.28, 0.392, 2);
+      add(new THREE.PlaneGeometry(0.1, 0.034), mat(0xffffff, { map: canvasTex(200, 68, (c) => { c.fillStyle = '#ece6d6'; c.fillRect(0, 0, 200, 68); hand(c, labels[i], 14, 48, 34); }), roughness: 0.8 }), g, 0, y - dh * 0.1, 0.3805);
+    }
+  };
+  unit(-0.93, 3, ['parafusos', 'cabos', 'ferramentas']); unit(0.93, 2, ['sensores', 'peças 3D']);
+  // PC gamer no canto direito do vão, de frente e sem giro, com a frente na mesma linha da dos gaveteiros: grade perfurada com três ventoinhas de LED atrás, fitas de LED nas bordas e botão de ligar; os LEDs mudam de cor
+  const led = (off = 0) => { const m = new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }); rgbLeds.push([m, off]); return m; };
+  const CW = 0.22, CH = 0.46, CD = 0.45, TT = 0.012, Y0 = 0.01;
+  const pc = group(room, 0.48, 0, 0.299 - CD / 2);   // a face da frente fica em z = 0,299 (igual à frente dos gaveteiros)
+  const caseM = mat(0x131417, { roughness: 0.4, metalness: 0.4 }), dkM = mat(0x0b0c0e, { roughness: 0.6 }), blkM = mat(0x1a1b20, { roughness: 0.45, metalness: 0.3 });
+  [[-1, -1], [1, -1], [-1, 1], [1, 1]].forEach(([sx, sz]) => rbox(0.03, Y0, 0.03, 0.002, dkM, pc, sx * 0.08, Y0 / 2, sz * 0.17, 1));   // pés
+  rbox(CW, CH, 0.014, 0.004, dkM, pc, 0, Y0 + CH / 2, -CD / 2 + 0.007, 2);                                                 // fundo
+  rbox(CW, TT, CD, 0.003, caseM, pc, 0, Y0 + TT / 2, 0, 2); rbox(CW, TT, CD, 0.003, caseM, pc, 0, Y0 + CH - TT / 2, 0, 2);   // base e topo
+  [-1, 1].forEach((s) => rbox(TT, CH, CD, 0.003, caseM, pc, s * (CW / 2 - TT / 2), Y0 + CH / 2, 0, 2));                    // laterais
+  [0, 1, 2].forEach((i) => {   // três ventoinhas de 120 mm empilhadas, com aros de LED
+    const f = group(pc, 0, Y0 + 0.105 + i * 0.13, CD / 2 - 0.035);
+    rbox(0.134, 0.134, 0.02, 0.006, blkM, f, 0, 0, -0.012, 2);
+    add(new THREE.TorusGeometry(0.062, 0.004, 8, 48), led(i * 0.12), f);
+    add(new THREE.TorusGeometry(0.044, 0.0018, 6, 36), led(i * 0.12 + 0.5), f);
+    add(new THREE.CircleGeometry(0.058, 36), dkM, f, 0, 0, -0.005);
+    for (let k = 0; k < 7; k++) { const arm = group(f, 0, 0, 0); arm.rotation.z = (k / 7) * Math.PI * 2; rbox(0.032, 0.013, 0.002, 0.001, blkM, arm, 0.033, 0, 0, 1).rotation.x = 0.5; }
+    cyl(0.013, 0.013, 0.007, blkM, f, 0, 0, 0, 16).rotation.x = Math.PI / 2;
+  });
+  [-1, 1].forEach((s) => rbox(0.004, CH - 0.07, 0.004, 0.001, led(0.2 + (s > 0 ? 0.4 : 0)), pc, s * (CW / 2 - 0.02), Y0 + CH / 2, CD / 2 - 0.012, 1));   // fitas de LED verticais atrás da grade
+  // grade frontal: painel escuro com furos de verdade (transparentes), para as ventoinhas aparecerem por trás
+  const meshTex = canvasTex(220, 460, (g, w, h) => { g.fillStyle = '#121316'; g.fillRect(0, 0, w, h); g.globalCompositeOperation = 'destination-out';
+    for (let y = 10; y < h - 6; y += 12) for (let x = (Math.floor(y / 12) % 2) ? 12 : 6; x < w - 4; x += 12) { g.beginPath(); g.arc(x, y, 3.6, 0, 7); g.fill(); } });
+  add(new THREE.PlaneGeometry(CW, CH), new THREE.MeshStandardMaterial({ map: meshTex, transparent: true, alphaTest: 0.5, roughness: 0.5, metalness: 0.3, side: THREE.DoubleSide }), pc, 0, Y0 + CH / 2, CD / 2 - 0.004).userData.noShadow = true;
+  rbox(CW - 0.06, 0.006, 0.004, 0.002, led(0.6), pc, 0, Y0 + 0.016, CD / 2 + 0.002, 1);                                  // faixa de LED na frente, embaixo
+  // no topo do PC: botão de ligar e duas portas USB; o cabo preto do Arduino (que desce pela borda da mesa e passa por cima do PC) termina plugado na da esquerda
+  cyl(0.009, 0.009, 0.004, new THREE.MeshBasicMaterial({ color: 0xcfe0ff }), pc, 0.05, Y0 + CH + 0.002, CD / 2 - 0.1, 20);   // botão de ligar (aceso)
+  add(new THREE.TorusGeometry(0.012, 0.0015, 6, 24), led(0.9), pc, 0.05, Y0 + CH + 0.0025, CD / 2 - 0.1).rotation.x = Math.PI / 2;   // aro de LED em volta do botão
+  [-0.07, -0.045].forEach((x) => rbox(0.013, 0.0015, 0.0055, 0.0005, dkM, pc, x, Y0 + CH + 0.00075, CD / 2 - 0.1, 1));   // portas USB
+  rbox(0.012, 0.004, 0.0045, 0.0008, mat(C.steel, METAL), pc, -0.07, Y0 + CH + 0.003, CD / 2 - 0.1, 1);   // ponta metálica do plugue (entra na porta)
+  rbox(0.017, 0.016, 0.011, 0.002, mat(0x1c1c20, { roughness: 0.5 }), pc, -0.07, Y0 + CH + 0.013, CD / 2 - 0.1, 1);   // capa do plugue
+  const pcl = new THREE.PointLight(0xa04bff, 0.9, 1.1, 1.6); pcl.position.set(0.48, 0.3, 0.5); scene.add(pcl); rgbLights.push([pcl, 0.1]);   // brilho do LED no chão
+  // lixeira aberta (parede dupla) e bolas de papel dentro, posicionadas sem encostar umas nas outras nem nas paredes
+  const binM = mat(0x4a4c53, { roughness: 0.5, metalness: 0.4, side: THREE.DoubleSide });
+  lathe([[0, 0], [0.093, 0], [0.115, 0.22], [0.109, 0.22], [0.087, 0.012], [0, 0.012]], binM, room, -0.46, 0, 0.02, 32);
+  const paper = (cx, cy, cz, seed) => {
+    const geo = new THREE.IcosahedronGeometry(0.022, 2), p = geo.attributes.position;
+    for (let i = 0; i < p.count; i++) { const n = 0.9 + 0.1 * Math.sin(p.getX(i) * 190 + seed) * Math.cos(p.getY(i) * 170 + seed * 2) + 0.05 * Math.sin(p.getZ(i) * 230 + seed * 3); p.setXYZ(i, p.getX(i) * n, p.getY(i) * n, p.getZ(i) * n); }
+    geo.computeVertexNormals(); add(geo, mat(0xece6d6, { roughness: 0.95, flatShading: true }), room, -0.46 + cx, cy, 0.02 + cz);
+  };
+  // camadas empilhadas (cada bola a pelo menos 0,0495 m das vizinhas, com as bolas medindo até 0,0231 m de raio) até perto da borda
+  const ring = (n, R, a0, y) => Array.from({ length: n }, (_, i) => { const a = a0 + (i / n) * Math.PI * 2; return [Math.cos(a) * R, y, Math.sin(a) * R]; });
+  [[0, 0.036, 0], ...ring(4, 0.055, 0, 0.036), ...ring(3, 0.045, 0.349, 0.086), [0, 0.13, 0], ...ring(3, 0.05, 1.396, 0.13), ...ring(3, 0.035, 0.349, 0.174)].forEach(([x, y, z], i) => paper(x, y, z, i + 1));
+  // filtro de linha encostado na parede, atrás e ao lado do PC; um cabo sobe até a tomada na parede e outro vai até a traseira do PC
+  rbox(0.34, 0.03, 0.07, 0.008, mat(0xece6d6, { roughness: 0.5 }), room, 0.2, 0.015, -0.43, 2);
+  add(new THREE.BoxGeometry(0.006, 0.003, 0.006), new THREE.MeshBasicMaterial({ color: 0x6bff7a }), room, 0.33, 0.0315, -0.43);
+  rbox(0.075, 0.075, 0.008, 0.004, mat(0xece6d6, { roughness: 0.5 }), room, -0.05, 0.3, -0.466, 2);   // tomada na parede
+  tube([[0.03, 0.02, -0.43], [-0.02, 0.01, -0.44], [-0.05, 0.1, -0.455], [-0.05, 0.285, -0.46]], 0.005, mat(0x16181c, { roughness: 0.6 }), room, 24, 6);
+  tube([[0.34, 0.02, -0.43], [0.4, 0.01, -0.3], [0.44, 0.03, -0.153]], 0.005, mat(0x16181c, { roughness: 0.6 }), room, 20, 6);
+  // fita de LED sob a borda da mesa e uma luz fraca azulada, para o vão não ficar um buraco escuro
+  add(new THREE.BoxGeometry(1.2, 0.006, 0.012), new THREE.MeshBasicMaterial({ color: 0x9fb8ff, toneMapped: false }), room, 0, 0.691, 0.29);
+  const under = new THREE.PointLight(0x7e9fff, 1.1, 1.5, 1.6); under.position.set(0, 0.5, 0.12); scene.add(under);
+})();
+
+mark('Parede (decoração)');
+(() => {
+  const WZ = -0.4685, FS = '"Funnel Sans"';
+  // quadros estilo galeria (artes originais desenhadas aqui, em design e videogame); cada arte é desenhada em 1000 unidades por metro
+  const art = (w, h, draw) => canvasTex(Math.round(w * 2000), Math.round(h * 2000), (g, cw, ch) => { g.scale(2, 2); draw(g, cw / 2, ch / 2); });
+  const bmp = (g, x, y, s, rows, color) => { g.fillStyle = color; rows.forEach((r, j) => [...r].forEach((c, i) => { if (c === '#') g.fillRect(x + i * s, y + j * s, s, s); })); };
+  const frame = (x, y, w, h, tex, style = 'black') => {
+    const g = group(room, x, y, WZ + 0.006);
+    rbox(w + 0.024, h + 0.024, 0.014, 0.002, mat({ black: 0x1c1c20, white: 0xece8e1, wood: 0x7a5238 }[style], { roughness: 0.5 }), g, 0, 0, 0, 2);
+    add(new THREE.PlaneGeometry(w, h), mat(0xffffff, { map: tex, roughness: 0.8, envMapIntensity: 0.15 }), g, 0, 0, 0.0075);
+  };
+  // --- videogame ---
+  const mapArt = art(0.26, 0.32, (g, w, h) => {   // mapa de uma ilha inventada
+    g.fillStyle = '#bfe0f0'; g.fillRect(0, 0, w, h); g.strokeStyle = 'rgba(40,90,130,.18)'; g.lineWidth = 1;
+    for (let x = 0; x < w; x += 26) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, h); g.stroke(); } for (let y = 0; y < h; y += 26) { g.beginPath(); g.moveTo(0, y); g.lineTo(w, y); g.stroke(); }
+    const blob = (cx, cy, r, col) => { g.fillStyle = col; g.beginPath(); for (let i = 0; i <= 72; i++) { const a = (i / 72) * Math.PI * 2, rr = r * (1 + 0.28 * Math.sin(3 * a + 1) + 0.16 * Math.sin(5 * a + 2) + 0.08 * Math.sin(9 * a)); const px = cx + Math.cos(a) * rr * 1.05, py = cy + Math.sin(a) * rr * 1.2; i ? g.lineTo(px, py) : g.moveTo(px, py); } g.closePath(); g.fill(); };
+    blob(130, 200, 74, '#6d8f3a'); blob(130, 200, 60, '#8fb04b'); blob(122, 188, 32, '#b5c76a');
+    g.fillStyle = '#7a5a3a'; [[100, 182], [118, 172], [136, 184], [150, 164]].forEach(([x, y]) => { g.beginPath(); g.moveTo(x - 10, y + 10); g.lineTo(x, y - 12); g.lineTo(x + 10, y + 10); g.closePath(); g.fill(); });
+    g.strokeStyle = '#4aa3d8'; g.lineWidth = 3; g.beginPath(); g.moveTo(126, 188); g.quadraticCurveTo(100, 222, 120, 262); g.stroke();
+    g.fillStyle = '#c8332b'; g.beginPath(); g.arc(152, 156, 5, 0, 7); g.fill();
+    g.fillStyle = '#26282e'; g.textAlign = 'left'; g.font = `600 18px ${FS}`; g.fillText('ILHA DO', 14, 28); g.fillText('CONTINUE', 14, 48);
+    g.font = '600 9px monospace'; [['#c8332b', 'CHEFE'], ['#f0c53e', 'LOJA'], ['#2f57c2', 'PORTO']].forEach(([c, t], i) => { g.fillStyle = c; g.fillRect(14, 62 + i * 14, 8, 8); g.fillStyle = '#26282e'; g.fillText(t, 28, 70 + i * 14); });
+    g.textAlign = 'center'; g.font = '700 14px monospace'; g.fillText('N', w - 26, 28); g.beginPath(); g.moveTo(w - 26, 34); g.lineTo(w - 32, 52); g.lineTo(w - 20, 52); g.closePath(); g.fill();
+  });
+  const startArt = art(0.26, 0.32, (g, w, h) => {   // controle e "aperte start"
+    g.fillStyle = '#14161d'; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#ece8e1'; g.textAlign = 'center'; g.font = `600 28px ${FS}`; g.fillText('PLAYER 1', w / 2, 56);
+    g.fillStyle = '#d9d4c7'; g.beginPath(); g.roundRect(36, 100, 188, 96, 30); g.fill();
+    g.fillStyle = '#2b2c31'; g.fillRect(64, 144, 44, 12); g.fillRect(80, 128, 12, 44);
+    g.fillStyle = '#c8332b'; g.beginPath(); g.arc(172, 156, 11, 0, 7); g.fill(); g.fillStyle = '#f0c53e'; g.beginPath(); g.arc(198, 140, 11, 0, 7); g.fill();
+    g.fillStyle = '#2b2c31'; g.fillRect(112, 176, 14, 6); g.fillRect(134, 176, 14, 6);
+    g.fillStyle = '#f0c53e'; g.font = '700 20px monospace'; g.fillText('PRESS START', w / 2, 262);
+    g.fillStyle = '#ece8e1'; for (let i = 0; i < 24; i++) g.fillRect((i * 97) % w, (i * 53) % 90 + 4 + (i % 3) * 190 % 70, 2, 2);
+  });
+  const coinArt = art(0.24, 0.32, (g, w, h) => {   // moeda, vidas e pontuação
+    g.fillStyle = '#e6782a'; g.fillRect(0, 0, w, h); g.fillStyle = '#17171a'; g.textAlign = 'center'; g.font = `600 44px ${FS}`; g.fillText('INSERT', w / 2, 62); g.fillText('COIN', w / 2, 106);
+    g.fillStyle = '#f0c53e'; g.beginPath(); g.arc(w / 2, 170, 36, 0, 7); g.fill(); g.strokeStyle = '#b8801a'; g.lineWidth = 5; g.beginPath(); g.arc(w / 2, 170, 28, 0, 7); g.stroke(); g.fillStyle = '#b8801a'; g.font = '700 30px monospace'; g.fillText('1', w / 2, 181);
+    const heart = ['.##.##.', '#######', '#######', '.#####.', '..###..', '...#...']; [0, 1, 2].forEach((i) => bmp(g, 30 + i * 62, 236, 6, heart, '#c8332b'));
+    g.fillStyle = '#17171a'; g.font = '700 12px monospace'; g.fillText('SCORE 000420', w / 2, 298);
+  });
+  const arcArt = art(0.26, 0.30, (g, w, h) => {   // anúncio retrô de joystick
+    const gr = g.createRadialGradient(w / 2, h * 0.5, 10, w / 2, h * 0.5, h * 0.75); gr.addColorStop(0, '#4a4a48'); gr.addColorStop(1, '#0e0e0e'); g.fillStyle = gr; g.fillRect(0, 0, w, h);
+    g.fillStyle = '#ece6d6'; g.font = `600 44px ${FS}`; g.textAlign = 'center'; g.fillText('ARCADE', w / 2, 50);
+    g.fillStyle = 'rgba(0,0,0,.5)'; g.beginPath(); g.ellipse(w / 2, 238, 56, 9, 0, 0, 7); g.fill();
+    g.fillStyle = '#2b2c31'; g.beginPath(); g.roundRect(w / 2 - 54, 196, 108, 30, 6); g.fill(); g.fillStyle = '#c8332b'; g.beginPath(); g.arc(w / 2 - 34, 211, 7, 0, 7); g.fill(); g.fillStyle = '#f0c53e'; g.beginPath(); g.arc(w / 2 + 34, 211, 7, 0, 7); g.fill();
+    g.strokeStyle = '#8a8d93'; g.lineWidth = 9; g.lineCap = 'round'; g.beginPath(); g.moveTo(w / 2, 196); g.lineTo(w / 2 - 14, 118); g.stroke();
+    g.fillStyle = '#c8332b'; g.beginPath(); g.arc(w / 2 - 16, 106, 26, 0, 7); g.fill(); g.fillStyle = 'rgba(255,255,255,.35)'; g.beginPath(); g.arc(w / 2 - 24, 96, 8, 0, 7); g.fill();
+    g.fillStyle = '#ece6d6'; g.font = `400 7px ${FS}`; ['Sinta o clique de cada botão.', 'Crie seus recordes e volte sempre.'].forEach((t, i) => g.fillText(t, w / 2, 262 + i * 10));
+  });
+  const apArt = art(0.28, 0.30, (g, w, h) => {   // cartaz tipográfico repetido, estilo cartaz de rua
+    g.fillStyle = '#1f7a3c'; g.fillRect(0, 0, w, h); g.fillStyle = '#f08a24'; g.font = `600 27px ${FS}`; g.textAlign = 'center'; for (let i = 0; i < 10; i++) g.fillText('APERTA START', w / 2, 30 + i * 28);
+  });
+  const goArt = art(0.24, 0.30, (g, w, h) => {
+    g.fillStyle = '#0b0b0d'; g.fillRect(0, 0, w, h); g.textAlign = 'center'; g.fillStyle = '#d83a2e'; g.font = '700 38px monospace'; g.fillText('GAME', w / 2, 60); g.fillText('OVER', w / 2, 100);
+    g.fillStyle = '#f0c53e'; g.font = `600 120px ${FS}`; g.fillText('9', w / 2, 210); g.fillStyle = '#ece8e1'; g.font = '700 16px monospace'; g.fillText('CONTINUE?', w / 2, 250); g.font = '500 9px monospace'; g.fillText('INSIRA FICHA', w / 2, 276);
+  });
+  const shootArt = art(0.22, 0.28, (g, w, h) => {   // nave pixelada, meteoros e tiros
+    g.fillStyle = '#0d1b3d'; g.fillRect(0, 0, w, h); g.fillStyle = '#cfd8ff'; for (let i = 0; i < 30; i++) g.fillRect((i * 71) % w, (i * 37) % h, 2, 2);
+    g.fillStyle = '#8a6a4a'; [[40, 70, 16], [170, 110, 12], [60, 150, 9]].forEach(([x, y, r]) => { g.beginPath(); g.arc(x, y, r, 0, 7); g.fill(); });
+    g.fillStyle = '#f0c53e'; [[w / 2 - 2, 120], [w / 2 - 2, 138], [w / 2 - 2, 156]].forEach(([x, y]) => g.fillRect(x, y, 4, 12));
+    bmp(g, w / 2 - 28, 172, 8, ['...#...', '..###..', '..###..', '.#####.', '.#####.', '#######', '#.###.#', '..#.#..'], '#ece8e1'); g.fillStyle = '#2f57c2'; g.fillRect(w / 2 - 4, 196, 8, 8); g.fillStyle = '#c8332b'; g.fillRect(w / 2 - 28, 220, 8, 8); g.fillRect(w / 2 + 20, 220, 8, 8);
+    g.textAlign = 'center'; g.fillStyle = '#f0c53e'; g.font = `600 18px ${FS}`; g.fillText('FASE 3', w / 2, 30); g.fillStyle = '#ece8e1'; g.font = '600 9px monospace'; g.fillText('SCORE 001200', w / 2, h - 12);
+  });
+  // --- design ---
+  const typeArt = art(0.24, 0.32, (g, w, h) => {
+    g.fillStyle = '#e9e3d6'; g.fillRect(0, 0, w, h); g.fillStyle = '#17171a'; g.font = `600 150px ${FS}`; g.textAlign = 'left'; g.fillText('Aa', 12, 170);
+    g.fillStyle = '#c8332b'; g.fillRect(w - 30, 0, 30, 30); g.fillStyle = '#17171a'; g.font = `600 12px ${FS}`; g.fillText('Funnel Sans', 16, 200);
+    g.font = `400 11px ${FS}`; ['ABCDEFGHIJKLM', 'NOPQRSTUVWXYZ', 'abcdefghijklm', '0123456789'].forEach((t, i) => g.fillText(t, 16, 222 + i * 18)); g.fillRect(16, 298, w - 32, 2);
+  });
+  const palArt = art(0.24, 0.30, (g, w, h) => {
+    g.fillStyle = '#f2efe8'; g.fillRect(0, 0, w, h); g.textAlign = 'left'; g.fillStyle = '#17171a'; g.font = `600 16px ${FS}`; g.fillText('PALETA', 16, 28);
+    ['#141414', '#ece8e1', '#1f3f9e', '#c8332b', '#f0c53e', '#3c8a5a'].forEach((c, i) => { g.fillStyle = c; g.fillRect(16, 40 + i * 40, w - 32, 36); if (i === 1) { g.strokeStyle = '#17171a'; g.lineWidth = 1; g.strokeRect(16.5, 80.5, w - 33, 35); }
+      g.fillStyle = i === 1 || i === 4 ? '#17171a' : '#f2efe8'; g.font = '500 9px monospace'; g.fillText(c.toUpperCase(), 24, 62 + i * 40); });
+  });
+  const objArt = art(0.26, 0.32, (g, w, h) => {   // "estudo de objeto", ficha técnica
+    g.fillStyle = '#e4e3df'; g.fillRect(0, 0, w, h); g.fillStyle = '#111'; g.textAlign = 'left'; g.font = '500 8px monospace'; g.fillText('ESTUDO DE OBJETO', 14, 20); g.fillText('UNIDADE 01 · REV A', 14, 66);
+    g.font = `600 30px ${FS}`; g.fillText('OBJETO / 01', 14, 50); g.strokeStyle = '#111'; g.lineWidth = 1; g.strokeRect(14, 84, w - 28, 150);
+    [48, 30].forEach((r) => { g.beginPath(); g.arc(w / 2, 159, r, 0, 7); g.stroke(); }); g.beginPath(); g.arc(w / 2, 159, 7, 0, 7); g.fill();
+    g.setLineDash([3, 3]); g.beginPath(); g.moveTo(14, 159); g.lineTo(w - 14, 159); g.moveTo(w / 2, 84); g.lineTo(w / 2, 234); g.stroke(); g.setLineDash([]);
+    g.fillStyle = '#c8332b'; g.fillRect(w / 2 + 34, 118, 10, 10); g.fillStyle = '#111'; g.font = '500 7px monospace'; ['01 CASCA', '02 EIXO', '03 MOLA'].forEach((t, i) => g.fillText(t, 20, 98 + i * 10));
+    for (let i = 0; i < 46; i++) g.fillRect(14 + i * 4.8, 268, 1 + ((i * 7) % 3), 28); g.font = '500 7px monospace'; g.fillText('ARQ-0001', 14, 252);
+  });
+  const bauArt = art(0.26, 0.32, (g, w, h) => {   // geometria estilo Bauhaus
+    g.fillStyle = '#e9e3d6'; g.fillRect(0, 0, w, h); g.fillStyle = '#1f3f9e'; g.beginPath(); g.arc(w / 2, 120, 78, 0, 7); g.fill();
+    g.fillStyle = '#c8332b'; g.fillRect(30, 210, 120, 70); g.fillStyle = '#2b2c31'; g.beginPath(); g.moveTo(w - 30, h - 28); g.lineTo(w - 30, 190); g.lineTo(w - 120, h - 28); g.closePath(); g.fill(); g.fillStyle = '#f0c53e'; g.fillRect(30, 30, 40, 8);
+  });
+  const droneArt = art(0.20, 0.26, (g, w, h) => {   // desenho técnico de drone
+    g.fillStyle = '#1c2f52'; g.fillRect(0, 0, w, h); lineGrid(g, w, h, 20, 'rgba(200,215,240,.08)'); g.strokeStyle = 'rgba(225,232,245,.85)'; g.lineWidth = 2.5;
+    const cx = w / 2, cy = h * 0.46; g.beginPath(); g.moveTo(cx - 55, cy - 55); g.lineTo(cx + 55, cy + 55); g.moveTo(cx + 55, cy - 55); g.lineTo(cx - 55, cy + 55); g.stroke();
+    [[-55, -55], [55, -55], [-55, 55], [55, 55]].forEach(([dx, dy]) => { g.beginPath(); g.arc(cx + dx, cy + dy, 24, 0, 7); g.stroke(); }); g.strokeRect(cx - 16, cy - 16, 32, 32);
+  });
+  const tagArt = art(0.26, 0.30, (g, w, h) => {   // frase de abertura do portfólio
+    g.fillStyle = '#1c1d21'; g.fillRect(0, 0, w, h); g.fillStyle = '#ece8e1'; g.textAlign = 'left'; g.font = `600 30px ${FS}`;
+    ['Projetando', 'onde o design', 'e a engenharia', 'se encontram.'].forEach((t, i) => g.fillText(t, 24, 70 + i * 40)); g.fillStyle = '#2f78c4'; g.fillRect(24, h - 50, 80, 6);
+  });
+  // duas fileiras, como numa parede de galeria (a de cima chega perto do topo da vista do celular)
+  const TOP = 2.09, BOT = 1.745;
+  frame(-0.86, TOP, 0.26, 0.32, mapArt, 'white'); frame(-0.54, TOP, 0.24, 0.32, typeArt, 'black'); frame(-0.20, TOP, 0.26, 0.32, startArt, 'black');
+  frame(0.14, TOP, 0.26, 0.32, objArt, 'wood'); frame(0.46, TOP, 0.24, 0.32, coinArt, 'black'); frame(0.78, TOP, 0.26, 0.32, bauArt, 'white');
+  frame(-0.92, BOT, 0.20, 0.26, droneArt, 'black'); frame(-0.62, BOT, 0.24, 0.30, palArt, 'wood'); frame(-0.30, BOT, 0.26, 0.30, arcArt, 'black');
+  frame(0.04, BOT, 0.28, 0.30, apArt, 'black'); frame(0.36, BOT, 0.24, 0.30, goArt, 'white'); frame(0.68, BOT, 0.26, 0.30, tagArt, 'black'); frame(0.99, BOT, 0.22, 0.28, shootArt, 'wood');
+  // relógio de parede (10h10), à direita dos quadros
+  const clock = group(room, 1.24, 1.8, WZ + 0.01);
+  cyl(0.072, 0.072, 0.02, mat(0x1c1c20, { roughness: 0.4 }), clock, 0, 0, 0, 40).rotation.x = Math.PI / 2;
+  const face = canvasTex(256, 256, (g, w, h) => { g.fillStyle = '#ece8e1'; g.beginPath(); g.arc(w / 2, h / 2, 120, 0, 7); g.fill(); g.fillStyle = '#1c1c20';
+    for (let i = 0; i < 12; i++) { const a = (i / 12) * Math.PI * 2; g.beginPath(); g.arc(w / 2 + Math.sin(a) * 100, h / 2 - Math.cos(a) * 100, i % 3 ? 3 : 6, 0, 7); g.fill(); }
+    g.strokeStyle = '#1c1c20'; g.lineCap = 'round'; const hd = (deg, len, lw) => { const a = (deg * Math.PI) / 180; g.lineWidth = lw; g.beginPath(); g.moveTo(w / 2, h / 2); g.lineTo(w / 2 + Math.sin(a) * len, h / 2 - Math.cos(a) * len); g.stroke(); }; hd(305, 60, 9); hd(60, 90, 6); });
+  add(new THREE.CircleGeometry(0.066, 40), mat(0xffffff, { map: face, roughness: 0.6 }), clock, 0, 0, 0.0105);
+})();
+
+// =====================================================================
 // PROJETOS: os modelos reais, do visualizador
 // =====================================================================
 const models = Object.fromEntries(await modelsP);
@@ -1675,11 +1863,11 @@ const resetPose = (m) => {
   m.elapsed = 0; m.pose.forEach(([o, p, q]) => { o.position.copy(p); o.quaternion.copy(q); });
 };
 // drone na prateleira de cima à esquerda
-placeModel('drone', { fitWidth: 0.3, at: V(-0.7, 1.3125, -0.35), yaw: 0.3 });
+placeModel('drone', { fitWidth: 0.3, at: V(-0.58, 1.3125, -0.335), yaw: 0.3 });   // deslocado para a direita e um pouco para a frente, como no círculo verde
 // a equipe (Blitzen + Killbot) em tamanho real (1 unidade = 16 mm), à direita do mouse
 placeModel('robo', { scale: 0.016, at: V(0.43, 0.744, 0.03), yaw: -0.1 });
 // o bicicletário como miniatura na prateleira de cima à direita; a caixa cobre o percurso da bicicleta
-placeModel('bike', { fitWidth: 0.42, at: V(0.66, 1.3125, -0.36), pre: 12.95, cycle: 22 });
+placeModel('bike', { fitWidth: 0.38, at: V(0.7, 1.3125, -0.37), yaw: 0.33 + Math.PI, pre: 12.95, cycle: 22 });   // ponta esquerda levemente para a frente (ângulo suave, de lado), girado 180° para a bicicleta ficar do lado direito e descer para a área livre; mais para dentro da prateleira (z -0,37 e x 0,70)
 // o Toddy em tamanho real (1 unidade = 10 mm), jogado na mesa à esquerda e encostado na caneca, com a frente para a câmera
 placeModel('toddy', { scale: 0.01, rotX: -Math.PI / 2, at: V(-0.6, 0.742, 0.06), yaw: 0.3 });
 P.toddy.built.root.traverse((o) => { if (o.material && o.material.color) { o.material.color.multiplyScalar(0.8); o.material.roughness = 0.88; o.material.metalness = 0; o.material.envMapIntensity = 0.35; if (o.material.bumpScale) o.material.bumpScale = 0.4; } });   // o branco do pacote estourava com as luzes da mesa: fosco, sem metal e com pouco reflexo do ambiente
@@ -1692,7 +1880,7 @@ scene.traverse((o) => { if (o.isMesh && !o.userData.hitbox) { o.castShadow = o !
 // ---------- câmera: paralaxe leve + voos ----------
 let W = 1, H = 1;
 // telas estreitas (celular em pé): em vez de abrir o campo de visão, a câmera recua até caber HALF_VIEW metros para cada lado do centro da mesa; o resto da mesa (até DESK_HALF) aparece quando a vista acompanha o dedo (panMax)
-const NARROW = 0.9, HALF_VIEW = 0.6, DESK_HALF = 1.35, NARROW_PITCH = 0.42;   // NARROW_PITCH: quanto a câmera olha para baixo (rad, ~24°)
+const NARROW = 0.9, HALF_VIEW = 0.6, DESK_HALF = 1.35, NARROW_PITCH = 0.42, PAN_LIMIT = 0.1;   // NARROW_PITCH: quanto a câmera olha para baixo (rad, ~24°); PAN_LIMIT: quanto o pan gira para cada lado (rad, ~6°)
 const HOME_WIDE = { pos: HOME.pos.clone(), look: HOME.look.clone() };
 let panMax = 0, homeDirty = false;
 const isNarrow = () => W / H < NARROW;
@@ -1702,7 +1890,7 @@ const resize = () => { W = innerWidth; H = innerHeight; renderer.setSize(W, H, f
     const dist = HALF_VIEW / (Math.tan((camera.fov * Math.PI) / 360) * camera.aspect);
     // câmera alta, olhando para baixo, para a mesa (NARROW_PITCH): mostra o tampo com os objetos e o monitor em vez de muita parede vazia
     HOME.look.set(0, 1.0, -0.15); HOME.pos.set(0, 1.0 + dist * Math.sin(NARROW_PITCH), -0.15 + dist * Math.cos(NARROW_PITCH));
-    panMax = Math.max(0, DESK_HALF - HALF_VIEW);
+    panMax = Math.min(Math.max(0, DESK_HALF - HALF_VIEW), dist * Math.tan(PAN_LIMIT));
   } else {
     camera.fov = W / H < 1.6 ? 40 * Math.min(1.45, 1.6 / (W / H)) : 40;
     HOME.pos.copy(HOME_WIDE.pos); HOME.look.copy(HOME_WIDE.look); panMax = 0;
@@ -1910,6 +2098,7 @@ function placeTag(t) {
 const awake = { drone: 0, bike: 0, robo: 0, toddy: 0 };
 let toddyHeld = 0;
 function animate(dt, t) {
+  rgbTick(t);
   const active = state.mode === 'desk' ? state.hover : state.focus;
   for (const id in awake) {
     const on = !!(active && active.userData.id === id), m = P[id];
