@@ -1691,22 +1691,23 @@ scene.traverse((o) => { if (o.isMesh && !o.userData.hitbox) { o.castShadow = o !
 
 // ---------- câmera: paralaxe leve + voos ----------
 let W = 1, H = 1;
-// telas estreitas (celular em pé): em vez de abrir o campo de visão, a câmera recua até caber HALF_VIEW metros para cada lado do centro da mesa; o resto da mesa (até DESK_HALF) fica a um arrasto de dedo (panT)
-const NARROW = 0.9, HALF_VIEW = 0.8, DESK_HALF = 1.35;
+// telas estreitas (celular em pé): em vez de abrir o campo de visão, a câmera recua até caber HALF_VIEW metros para cada lado do centro da mesa; o resto da mesa (até DESK_HALF) aparece quando a vista acompanha o dedo (panMax)
+const NARROW = 0.9, HALF_VIEW = 0.6, DESK_HALF = 1.35, NARROW_PITCH = 0.42;   // NARROW_PITCH: quanto a câmera olha para baixo (rad, ~24°)
 const HOME_WIDE = { pos: HOME.pos.clone(), look: HOME.look.clone() };
-let panT = 0, panS = 0, panMax = 0, panK = 0, homeDirty = false;
+let panMax = 0, homeDirty = false;
 const isNarrow = () => W / H < NARROW;
 const resize = () => { W = innerWidth; H = innerHeight; renderer.setSize(W, H, false); cssRenderer.setSize(W, H); camera.aspect = W / H;
   if (isNarrow()) {
     camera.fov = 40;
     const dist = HALF_VIEW / (Math.tan((camera.fov * Math.PI) / 360) * camera.aspect);
-    HOME.look.set(0, 0.95, -0.45); HOME.pos.set(0, 0.91, -0.45 + dist);   // centro baixo o bastante para a vista não passar do topo da parede
-    panMax = Math.max(0, DESK_HALF - HALF_VIEW); panK = (2 * HALF_VIEW) / W;
+    // câmera alta, olhando para baixo, para a mesa (NARROW_PITCH): mostra o tampo com os objetos e o monitor em vez de muita parede vazia
+    HOME.look.set(0, 1.0, -0.15); HOME.pos.set(0, 1.0 + dist * Math.sin(NARROW_PITCH), -0.15 + dist * Math.cos(NARROW_PITCH));
+    panMax = Math.max(0, DESK_HALF - HALF_VIEW);
   } else {
     camera.fov = W / H < 1.6 ? 40 * Math.min(1.45, 1.6 / (W / H)) : 40;
     HOME.pos.copy(HOME_WIDE.pos); HOME.look.copy(HOME_WIDE.look); panMax = 0;
   }
-  panT = Math.max(-panMax, Math.min(panMax, panT)); homeDirty = true; camera.updateProjectionMatrix(); };
+  homeDirty = true; camera.updateProjectionMatrix(); };
 addEventListener('resize', resize); resize();
 const mouseN = new THREE.Vector2(), mouseS = new THREE.Vector2();
 const cam = { pos: HOME.pos.clone(), look: HOME.look.clone() };
@@ -1729,7 +1730,7 @@ const pick = (e) => {
 };
 const glowOn = (g, on) => g && g.traverse((o) => { if (o.material && o.material.emissive && o !== screen) o.material.emissive.setHex(on ? 0x14286e : 0x000000); });
 const setHover = (g) => { if (g === state.hover) return; glowOn(state.hover, false); state.hover = g; glowOn(g, true); document.body.classList.toggle('hover', !!g); };
-addEventListener('pointermove', (e) => { if (e.pointerType !== 'mouse') return; mouseN.set((e.clientX / W) * 2 - 1, (e.clientY / H) * 2 - 1); if (state.mode === 'desk' && !fly) setHover(pick(e)); });
+addEventListener('pointermove', (e) => { mouseN.set((e.clientX / W) * 2 - 1, (e.clientY / H) * 2 - 1); if (e.pointerType === 'mouse' && state.mode === 'desk' && !fly) setHover(pick(e)); });   // o dedo move a vista como o mouse; o brilho de "passar o mouse" é só do mouse
 
 const hint2 = document.getElementById('hint2'), tag = document.getElementById('tag'), stringPath = document.getElementById('stringPath'), site = document.getElementById('site');
 // câmera de cada projeto: o objeto no terço esquerdo e a direita livre para a etiqueta; os da mesa são vistos mais de cima
@@ -1804,20 +1805,8 @@ canvas.addEventListener('pointermove', (e) => {
 });
 const endDrag = () => { if (!drag) return; dragged = drag.moved; drag = null; document.body.classList.remove('dragging'); };
 canvas.addEventListener('pointerup', endDrag); canvas.addEventListener('pointercancel', endDrag);
-// celular: na mesa, arrastar o dedo para os lados desliza a vista (só quando a tela é estreita e a mesa não cabe inteira)
-let pan = null;
+// celular: o navegador não deve rolar nem dar zoom por conta própria; o dedo só manda eventos para a cena
 canvas.style.touchAction = 'none';
-canvas.addEventListener('pointerdown', (e) => {
-  if (e.pointerType === 'mouse' || state.mode !== 'desk' || fly || !panMax) return;
-  pan = { x: e.clientX, t: panT, moved: false }; try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
-});
-canvas.addEventListener('pointermove', (e) => {
-  if (!pan) return;
-  const dx = e.clientX - pan.x; if (!pan.moved && Math.abs(dx) > 6) pan.moved = true;
-  if (pan.moved) panT = Math.max(-panMax, Math.min(panMax, pan.t - dx * panK));   // a mesa acompanha o dedo
-});
-const endPan = () => { if (!pan) return; dragged = pan.moved; pan = null; };
-canvas.addEventListener('pointerup', endPan); canvas.addEventListener('pointercancel', endPan);
 canvas.addEventListener('click', (e) => {
   if (dragged) { dragged = false; return; }
   if (fly) return;
@@ -1999,8 +1988,8 @@ function frame(t) {
   if (homeDirty && !fly) { homeDirty = false; if (state.mode === 'desk') { cam.pos.copy(HOME.pos); cam.look.copy(HOME.look); } }   // a tela mudou de tamanho (ex.: girou o celular)
   const par = state.mode === 'desk' && !fly ? 1 : 0;
   mouseS.lerp(new THREE.Vector2(mouseN.x * par, mouseN.y * par), Math.min(1, dt * 3));
-  panS += (panT * par - panS) * Math.min(1, dt * 8);
-  camera.position.copy(cam.pos).add(V(mouseS.x * 0.055 + panS, -mouseS.y * 0.03, 0)); camera.lookAt(cam.look.x + panS, cam.look.y, cam.look.z);
+  // computador: a câmera acompanha o mouse de leve; celular em pé: acompanha o dedo do mesmo jeito, só que a vista desliza por toda a mesa (panMax = quanto da mesa fica além da tela)
+  camera.position.copy(cam.pos).add(V(mouseS.x * (panMax || 0.055), -mouseS.y * 0.03, 0)); camera.lookAt(cam.look.x + mouseS.x * panMax, cam.look.y, cam.look.z);
   cssCamera.fov = camera.fov; cssCamera.aspect = camera.aspect; cssCamera.updateProjectionMatrix();
   cssCamera.position.copy(camera.position).multiplyScalar(K); cssCamera.quaternion.copy(camera.quaternion);
   animate(dt, t); placeTag(t); freeReadout();
