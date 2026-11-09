@@ -1691,8 +1691,22 @@ scene.traverse((o) => { if (o.isMesh && !o.userData.hitbox) { o.castShadow = o !
 
 // ---------- câmera: paralaxe leve + voos ----------
 let W = 1, H = 1;
+// telas estreitas (celular em pé): em vez de abrir o campo de visão, a câmera recua até caber HALF_VIEW metros para cada lado do centro da mesa; o resto da mesa (até DESK_HALF) fica a um arrasto de dedo (panT)
+const NARROW = 0.9, HALF_VIEW = 0.8, DESK_HALF = 1.35;
+const HOME_WIDE = { pos: HOME.pos.clone(), look: HOME.look.clone() };
+let panT = 0, panS = 0, panMax = 0, panK = 0, homeDirty = false;
+const isNarrow = () => W / H < NARROW;
 const resize = () => { W = innerWidth; H = innerHeight; renderer.setSize(W, H, false); cssRenderer.setSize(W, H); camera.aspect = W / H;
-  camera.fov = W / H < 1.6 ? 40 * Math.min(1.45, 1.6 / (W / H)) : 40; camera.updateProjectionMatrix(); };
+  if (isNarrow()) {
+    camera.fov = 40;
+    const dist = HALF_VIEW / (Math.tan((camera.fov * Math.PI) / 360) * camera.aspect);
+    HOME.look.set(0, 0.95, -0.45); HOME.pos.set(0, 0.91, -0.45 + dist);   // centro baixo o bastante para a vista não passar do topo da parede
+    panMax = Math.max(0, DESK_HALF - HALF_VIEW); panK = (2 * HALF_VIEW) / W;
+  } else {
+    camera.fov = W / H < 1.6 ? 40 * Math.min(1.45, 1.6 / (W / H)) : 40;
+    HOME.pos.copy(HOME_WIDE.pos); HOME.look.copy(HOME_WIDE.look); panMax = 0;
+  }
+  panT = Math.max(-panMax, Math.min(panMax, panT)); homeDirty = true; camera.updateProjectionMatrix(); };
 addEventListener('resize', resize); resize();
 const mouseN = new THREE.Vector2(), mouseS = new THREE.Vector2();
 const cam = { pos: HOME.pos.clone(), look: HOME.look.clone() };
@@ -1715,7 +1729,7 @@ const pick = (e) => {
 };
 const glowOn = (g, on) => g && g.traverse((o) => { if (o.material && o.material.emissive && o !== screen) o.material.emissive.setHex(on ? 0x14286e : 0x000000); });
 const setHover = (g) => { if (g === state.hover) return; glowOn(state.hover, false); state.hover = g; glowOn(g, true); document.body.classList.toggle('hover', !!g); };
-addEventListener('pointermove', (e) => { mouseN.set((e.clientX / W) * 2 - 1, (e.clientY / H) * 2 - 1); if (state.mode === 'desk' && !fly) setHover(pick(e)); });
+addEventListener('pointermove', (e) => { if (e.pointerType !== 'mouse') return; mouseN.set((e.clientX / W) * 2 - 1, (e.clientY / H) * 2 - 1); if (state.mode === 'desk' && !fly) setHover(pick(e)); });
 
 const hint2 = document.getElementById('hint2'), tag = document.getElementById('tag'), stringPath = document.getElementById('stringPath'), site = document.getElementById('site');
 // câmera de cada projeto: o objeto no terço esquerdo e a direita livre para a etiqueta; os da mesa são vistos mais de cima
@@ -1726,15 +1740,20 @@ let orbit = null;   // câmera em órbita no destaque: { c, R, el0, az, el, azT,
 function openFocus(g) {
   const id = g.userData.id, m = P[id], F = FOCUS[id];
   state.mode = 'focus'; state.focus = g; setHover(null); document.body.classList.add('away', 'focus'); document.body.classList.toggle('nodrag', F.drag === 'none'); hint2.textContent = HINT2[F.drag]; orbit = null;
+  // celular em pé: o objeto fica centralizado e no alto da tela (ocupando ~80% da largura) e a etiqueta vai embaixo; "lift" sobe o objeto no quadro sem mudar o ângulo da câmera
+  const narrow = isNarrow(), tf = Math.tan((camera.fov * Math.PI) / 360);
   const c = new THREE.Box3().setFromObject(g).getCenter(V()), r = Math.max(m.size.x, m.size.y, m.size.z);
-  const d = r * F.dist + 0.1;
-  if (id === 'toddy') { // o pacote é pego e fica em pé: a câmera para de frente para ele, um pouco acima, com a etiqueta à direita
+  const d = narrow ? (r * 0.625) / (tf * camera.aspect) : r * F.dist + 0.1;
+  const lift = narrow ? 0.4 * d * tf : 0;
+  if (id === 'toddy') { // o pacote é pego e fica em pé: a câmera para de frente para ele, um pouco acima, com a etiqueta à direita (ou embaixo, no celular)
     const C = m.at.clone().add(TODDY_HELD), fw = V(Math.sin(m.yaw), 0, Math.cos(m.yaw)), rt = V(Math.cos(m.yaw), 0, -Math.sin(m.yaw));
-    flyTo(C.clone().addScaledVector(fw, 0.44).add(V(0, 0.035, 0)), C.clone().addScaledVector(rt, 0.08), 950, () => showTag(g));
+    if (narrow) { const td = Math.max(0.35, 0.0735 / (tf * camera.aspect)), tl = 0.4 * td * tf;
+      flyTo(C.clone().addScaledVector(fw, td).add(V(0, 0.035 - tl, 0)), C.clone().add(V(0, -tl, 0)), 950, () => showTag(g)); }
+    else flyTo(C.clone().addScaledVector(fw, 0.44).add(V(0, 0.035, 0)), C.clone().addScaledVector(rt, 0.08), 950, () => showTag(g));
     focusLight.position.copy(C).addScaledVector(fw, 0.25).add(V(0.05, 0.1, 0)); focusLight.userData.target = 0.35; return;
   }
-  const from = c.clone().add(V(0, d * F.up * 0.45, d));
-  flyTo(from, c.clone().add(V(r * 0.42, 0, 0)), 950, () => { showTag(g); if (F.drag === 'orbit') { const o = from.clone().sub(c); orbit = { c, side: r * 0.42, R: o.length(), el0: Math.asin(o.y / o.length()), az: 0, el: 0, azT: 0, elT: 0 }; } });
+  const from0 = c.clone().add(V(0, d * F.up * 0.45, d)), from = from0.clone().add(V(0, -lift, 0));
+  flyTo(from, c.clone().add(V(narrow ? 0 : r * 0.42, -lift, 0)), 950, () => { showTag(g); if (F.drag === 'orbit') { const o = from0.clone().sub(c); orbit = { c, side: narrow ? 0 : r * 0.42, lift, R: o.length(), el0: Math.asin(o.y / o.length()), az: 0, el: 0, azT: 0, elT: 0 }; } });
   focusLight.position.copy(c).add(V(0.05, 0.2, 0.3)); focusLight.userData.target = 1.3;
 }
 function showTag(g) {
@@ -1766,6 +1785,7 @@ document.addEventListener('click', (e) => { if (state.mode === 'screen' && site.
 // no destaque, arrastar gira o projeto (de lado a lado, e inclina um pouco para cima e para baixo)
 let drag = null, dragged = false;
 canvas.addEventListener('pointerdown', (e) => {
+  dragged = false;   // todo toque novo zera o "foi arrasto": no celular o clique que viria depois do arrasto não acontece
   if (state.mode !== 'focus' || fly) return;
   const m = P[state.focus.userData.id], mode = FOCUS[state.focus.userData.id].drag;
   if (mode === 'orbit' && !orbit) return;
@@ -1784,6 +1804,20 @@ canvas.addEventListener('pointermove', (e) => {
 });
 const endDrag = () => { if (!drag) return; dragged = drag.moved; drag = null; document.body.classList.remove('dragging'); };
 canvas.addEventListener('pointerup', endDrag); canvas.addEventListener('pointercancel', endDrag);
+// celular: na mesa, arrastar o dedo para os lados desliza a vista (só quando a tela é estreita e a mesa não cabe inteira)
+let pan = null;
+canvas.style.touchAction = 'none';
+canvas.addEventListener('pointerdown', (e) => {
+  if (e.pointerType === 'mouse' || state.mode !== 'desk' || fly || !panMax) return;
+  pan = { x: e.clientX, t: panT, moved: false }; try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (!pan) return;
+  const dx = e.clientX - pan.x; if (!pan.moved && Math.abs(dx) > 6) pan.moved = true;
+  if (pan.moved) panT = Math.max(-panMax, Math.min(panMax, pan.t - dx * panK));   // a mesa acompanha o dedo
+});
+const endPan = () => { if (!pan) return; dragged = pan.moved; pan = null; };
+canvas.addEventListener('pointerup', endPan); canvas.addEventListener('pointercancel', endPan);
 canvas.addEventListener('click', (e) => {
   if (dragged) { dragged = false; return; }
   if (fly) return;
@@ -1874,7 +1908,8 @@ const toScreen = (v) => { const p = v.clone().project(camera); return { x: (p.x 
 function placeTag(t) {
   if (state.mode !== 'focus' || !tag.classList.contains('show')) return;
   const m = P[state.focus.userData.id], a = toScreen(m.anchor.clone().applyAxisAngle(V(0, 1, 0), m.yaw).add(m.at));
-  const x = Math.min(W - 300, a.x + Math.max(150, W * 0.13)), y = Math.min(H - 200, Math.max(20, a.y - 20));
+  const narrow = isNarrow();   // celular em pé: etiqueta centralizada embaixo, o objeto fica livre em cima
+  const x = narrow ? (W - 280) / 2 : Math.min(W - 300, a.x + Math.max(150, W * 0.13)), y = narrow ? Math.min(H * 0.6, H - 240) : Math.min(H - 200, Math.max(20, a.y - 20));
   tag.style.transform = 'translate(' + x + 'px,' + y + 'px)';
   const k = (t - swingT0) / 1000, ang = 8 * Math.exp(-k * 2) * Math.cos(k * 6.5);
   tag.querySelector('.swing').style.transform = 'rotate(' + ang + 'deg)';
@@ -1958,12 +1993,14 @@ function frame(t) {
   if (orbit && state.mode === 'focus' && !fly) {
     const k = Math.min(1, dt * 8); orbit.az += (orbit.azT - orbit.az) * k; orbit.el += (orbit.elT - orbit.el) * k;
     const el = orbit.el0 + orbit.el, ch = Math.cos(el) * orbit.R;
-    cam.pos.set(orbit.c.x + Math.sin(orbit.az) * ch, orbit.c.y + Math.sin(el) * orbit.R, orbit.c.z + Math.cos(orbit.az) * ch);
-    cam.look.set(orbit.c.x + Math.cos(orbit.az) * orbit.side, orbit.c.y, orbit.c.z - Math.sin(orbit.az) * orbit.side);   // o objeto continua no terço esquerdo
+    cam.pos.set(orbit.c.x + Math.sin(orbit.az) * ch, orbit.c.y + Math.sin(el) * orbit.R - orbit.lift, orbit.c.z + Math.cos(orbit.az) * ch);
+    cam.look.set(orbit.c.x + Math.cos(orbit.az) * orbit.side, orbit.c.y - orbit.lift, orbit.c.z - Math.sin(orbit.az) * orbit.side);   // o objeto continua no terço esquerdo (no celular, centralizado e no alto)
   }
+  if (homeDirty && !fly) { homeDirty = false; if (state.mode === 'desk') { cam.pos.copy(HOME.pos); cam.look.copy(HOME.look); } }   // a tela mudou de tamanho (ex.: girou o celular)
   const par = state.mode === 'desk' && !fly ? 1 : 0;
   mouseS.lerp(new THREE.Vector2(mouseN.x * par, mouseN.y * par), Math.min(1, dt * 3));
-  camera.position.copy(cam.pos).add(V(mouseS.x * 0.055, -mouseS.y * 0.03, 0)); camera.lookAt(cam.look);
+  panS += (panT * par - panS) * Math.min(1, dt * 8);
+  camera.position.copy(cam.pos).add(V(mouseS.x * 0.055 + panS, -mouseS.y * 0.03, 0)); camera.lookAt(cam.look.x + panS, cam.look.y, cam.look.z);
   cssCamera.fov = camera.fov; cssCamera.aspect = camera.aspect; cssCamera.updateProjectionMatrix();
   cssCamera.position.copy(camera.position).multiplyScalar(K); cssCamera.quaternion.copy(camera.quaternion);
   animate(dt, t); placeTag(t); freeReadout();
