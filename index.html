@@ -1988,8 +1988,8 @@ function frame(t) {
   if (homeDirty && !fly) { homeDirty = false; if (state.mode === 'desk') { cam.pos.copy(HOME.pos); cam.look.copy(HOME.look); } }   // a tela mudou de tamanho (ex.: girou o celular)
   const par = state.mode === 'desk' && !fly ? 1 : 0;
   mouseS.lerp(new THREE.Vector2(mouseN.x * par, mouseN.y * par), Math.min(1, dt * 3));
-  // computador: a câmera acompanha o mouse de leve; celular em pé: acompanha o dedo do mesmo jeito, só que a vista desliza por toda a mesa (panMax = quanto da mesa fica além da tela)
-  camera.position.copy(cam.pos).add(V(mouseS.x * (panMax || 0.055), -mouseS.y * 0.03, 0)); camera.lookAt(cam.look.x + mouseS.x * panMax, cam.look.y, cam.look.z);
+  // computador: a câmera acompanha o mouse de leve; celular em pé: PAN, a câmera fica no lugar e gira para os lados acompanhando o dedo, varrendo toda a mesa (panMax = quanto da mesa fica além da tela)
+  camera.position.copy(cam.pos).add(V(panMax ? 0 : mouseS.x * 0.055, -mouseS.y * 0.03, 0)); camera.lookAt(cam.look.x + mouseS.x * panMax, cam.look.y, cam.look.z);
   cssCamera.fov = camera.fov; cssCamera.aspect = camera.aspect; cssCamera.updateProjectionMatrix();
   cssCamera.position.copy(camera.position).multiplyScalar(K); cssCamera.quaternion.copy(camera.quaternion);
   animate(dt, t); placeTag(t); freeReadout();
