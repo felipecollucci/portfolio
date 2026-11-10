@@ -18,6 +18,9 @@
   body.hover canvas#gl { cursor: pointer; }
   #veil { position: fixed; inset: 0; display: grid; place-items: center; background: #141416; color: var(--ink-60); font-size: 14px; letter-spacing: .02em; transition: opacity .9s ease; }
   #veil.off { opacity: 0; pointer-events: none; }
+  #veil .vbox { display: grid; gap: 18px; justify-items: center; text-align: center; padding: 0 24px; }
+  #vgo { font: inherit; font-size: 15px; letter-spacing: .01em; color: #141416; background: #ece8e1; border: 0; border-radius: 999px; padding: 13px 24px; cursor: pointer; }
+  #vgo[hidden] { display: none; }
   #hint { position: fixed; left: 20px; bottom: 16px; font-size: 13px; color: var(--ink-60); pointer-events: none; transition: opacity .3s; }
   body.away #hint { opacity: 0; }
   #hint2 { position: fixed; left: 20px; bottom: 16px; font-size: 13px; color: var(--ink-60); pointer-events: none; opacity: 0; transition: opacity .3s; }
@@ -70,7 +73,25 @@
 <div id="hint3">clique fora do site, ou aperte Esc, para voltar para a mesa</div>
 <div id="hint2">arraste para girar o projeto · clique fora ou Esc para voltar</div>
 <div id="free"><b>câmera livre</b> · botão do meio move · Shift + botão do meio gira · rodinha aproxima · H volta ao início · F ou Esc sai<br><code class="xyz"></code></div>
-<div id="veil">carregando o escritório…</div>
+<div id="veil"><div class="vbox"><div id="vmsg">carregando o escritório…</div><button id="vgo" type="button" hidden>toque para ativar o movimento</button></div></div>
+<script>
+// Tela de carregamento. O escritório começa a carregar na hora, por trás desta tela.
+// Celular: a página tenta liberar o sensor de movimento sozinha, já durante o carregamento. Onde o sistema exige um toque antes (iPhone, regra da Apple), aparece o botão: o toque faz o pedido enquanto a cena termina de carregar.
+// Se a cena terminar antes do toque, a tela espera o toque para entrar (assim o pedido nunca fica para depois). Computador, e celular que libera sozinho: a tela some quando a cena fica pronta.
+(() => {
+  const D = window.DeviceOrientationEvent, veil = document.getElementById('veil'), msg = document.getElementById('vmsg'), btn = document.getElementById('vgo');
+  const ask = !!(D && typeof D.requestPermission === 'function') && matchMedia('(pointer: coarse)').matches;
+  const v = window.__veil = { needTap: ask, tapped: false, loaded: false, tilt: null, onTilt: null };
+  const hide = () => { if (v.loaded && (!v.needTap || v.tapped)) veil.classList.add('off'); };
+  const label = () => { btn.textContent = v.loaded ? 'toque para entrar' : 'toque para ativar o movimento'; if (v.loaded) msg.textContent = 'pronto'; };
+  const got = (s) => { v.tilt = s; if (s === 'granted' && v.onTilt) v.onTilt(); };
+  v.done = () => { v.loaded = true; if (v.needTap && !v.tapped && !btn.hidden) label(); hide(); };
+  if (!ask) return;
+  btn.addEventListener('click', () => { v.tapped = true; btn.hidden = true; hide(); D.requestPermission().then(got).catch(() => got('denied')); });
+  // primeira tentativa sem toque: se o sistema liberar, não precisa de botão; se recusar por falta de toque, mostra o botão
+  D.requestPermission().then((s) => { if (s === 'granted') { got(s); v.needTap = false; hide(); } else { label(); btn.hidden = false; } }).catch(() => { label(); btn.hidden = false; });
+})();
+</script>
 
 <script type="module">
 import * as THREE from 'three';
@@ -1862,12 +1883,8 @@ const onTilt = (e) => {
   gyro.on = true;
   mouseN.set(gyroClamp((e.gamma - gyro.g0) / GYRO_RANGE), gyroClamp((e.beta - gyro.b0) / (GYRO_RANGE * 1.5)));   // gamma: inclinar para os lados; beta: inclinar para frente/trás
 };
-const startTilt = () => {
-  const D = window.DeviceOrientationEvent; if (!D) return;
-  const go = () => addEventListener('deviceorientation', onTilt);
-  if (typeof D.requestPermission === 'function') {   // iPhone: o sistema pede licença, e só aceita depois de um toque
-    addEventListener('pointerup', function ask(e) { if (e.pointerType !== 'touch') return; removeEventListener('pointerup', ask); D.requestPermission().then((s) => { if (s === 'granted') go(); }).catch(() => {}); });
-  } else go();   // Android: começa direto
+const startTilt = () => {   // o sensor fica sempre escutando: onde o sistema exige licença (iPhone), o pedido é feito na tela de carregamento (script do #veil) e os movimentos só chegam depois que a pessoa aceita
+  if (window.DeviceOrientationEvent) addEventListener('deviceorientation', onTilt);
 };
 if (matchMedia('(pointer: coarse)').matches) { startTilt(); document.getElementById('hint').textContent = 'incline o celular para olhar em volta · toque nos projetos e no monitor'; }
 addEventListener('resize', () => { gyro.g0 = null; });   // girou o celular ou mudou a tela: recalibra o centro
@@ -2138,7 +2155,7 @@ function frame(t) {
   cssCamera.position.copy(camera.position).multiplyScalar(K); cssCamera.quaternion.copy(camera.quaternion);
   animate(dt, t); placeTag(t); freeReadout();
   renderer.render(scene, camera); cssRenderer.render(cssScene, cssCamera);
-  if (first) { first = false; document.getElementById('veil').classList.add('off'); if (/export/.test(location.search)) { exportGLB().catch((e) => { window.__glbInfo = { error: String(e) }; }); return; } }
+  if (first) { first = false; window.__veil.done(); if (/export/.test(location.search)) { exportGLB().catch((e) => { window.__glbInfo = { error: String(e) }; }); return; } }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
