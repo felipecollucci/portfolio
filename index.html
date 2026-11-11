@@ -1974,6 +1974,101 @@ P.toddy.anchor = V(0.06, TODDY_HELD.y + 0.085, 0);
 // sombras em tudo (menos a tela)
 scene.traverse((o) => { if (o.isMesh && !o.userData.hitbox) { o.castShadow = o !== screen && !o.userData.noShadow; o.receiveShadow = true; } });
 
+// ---------- otimizações da cena montada (no ?export nada disso roda, para o Blender receber a cena como sempre) ----------
+if (!/export/.test(location.search)) {
+  // 1) materiais idênticos viram uma única instância (menos trocas de estado e de programa na GPU; o visual não muda)
+  // fora: os projetos clicáveis e o monitor (pulseMats mexe no emissive deles), os LEDs RGB (cor muda a cada quadro) e a tela; um material que também apareça nesses grupos fica de fora
+  const skipRoots = new Set([monitor, ...Object.values(P).map((m) => m.holder)]);
+  const protectedMats = new Set([screen.material, screenMatPlaceholder, ...rgbLeds.map(([m]) => m)]);
+  const matsOf = (o) => (Array.isArray(o.material) ? o.material : [o.material]);
+  skipRoots.forEach((r) => r.traverse((o) => { if (o.material) matsOf(o).forEach((m) => protectedMats.add(m)); }));
+  const DEDUP_TYPES = new Set(['MeshStandardMaterial', 'MeshPhysicalMaterial', 'MeshBasicMaterial', 'MeshLambertMaterial', 'MeshPhongMaterial']);
+  // chave = tipo + todas as propriedades próprias (cores, números, texturas por uuid); se houver algo desconhecido (função, objeto estranho), devolve null e o material fica como está
+  const matKey = (m) => {
+    if (!DEDUP_TYPES.has(m.type)) { return null; }
+    const parts = [m.type];
+    for (const k of Object.keys(m).sort()) {
+      if (k === 'uuid' || k === 'id' || k === 'version' || k === 'name' || k === '_listeners') continue;
+      const v = m[k];
+      if (v === null || v === undefined || typeof v === 'number' || typeof v === 'boolean' || typeof v === 'string') parts.push(k + '=' + v);
+      else if (typeof v === 'function') { return null; }
+      else if (v.isColor) parts.push(k + '=' + v.getHex());
+      else if (v.isTexture) parts.push(k + '=tex:' + v.uuid);
+      else if (v.isVector2 || v.isVector3) parts.push(k + '=' + v.toArray().join(','));
+      else { let j = null; try { j = JSON.stringify(v); } catch (e) {} if (j == null || j.length > 2000) { return null; } parts.push(k + '=' + j); }   // objetos simples (defines, userData, clippingPlanes...)
+    }
+    return parts.join('|');
+  };
+  const shared = new Map(), seen = new Set(), unkeyed = new Set();
+  const unify = (m) => {
+    if (protectedMats.has(m)) return m;
+    if (!seen.has(m)) { seen.add(m); }
+    const key = matKey(m); if (!key) { unkeyed.add(m); return m; }
+    const s = shared.get(key); if (s) return s;
+    shared.set(key, m); return m;
+  };
+  const dedupe = (o) => {
+    if (skipRoots.has(o)) return;
+    if (o.isMesh && !o.userData.hitbox && o.material) o.material = Array.isArray(o.material) ? o.material.map(unify) : unify(o.material);
+    o.children.forEach(dedupe);
+  };
+  dedupe(scene);
+  console.info('materiais (fora dos projetos e do monitor): ' + seen.size + ' antes, ' + (shared.size + unkeyed.size) + ' depois');
+
+  // 2) objetos parados de room com o mesmo material (e mesmas flags de sombra) viram uma malha só: menos draw calls
+  // fora: invisíveis, instanciados, skinned, com morph/interleaved, material transparente, em array ou protegido (LEDs RGB, tela), hitbox, onBeforeRender/depth próprios, frustumCulled=false; os projetos e o monitor nem estão em room
+  {
+    room.updateMatrixWorld(true);
+    const inv = new THREE.Matrix4().copy(room.matrixWorld).invert();
+    const visibleUp = (o) => { for (; o && o !== room; o = o.parent) if (!o.visible) return false; return true; };
+    const groups = new Map();
+    room.traverse((o) => {
+      if (o === room || !o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || o === screen || o.userData.hitbox) return;
+      const m = o.material, g = o.geometry;
+      if (!m || Array.isArray(m) || m.transparent !== false || m.visible === false || protectedMats.has(m)) return;
+      if (!visibleUp(o) || !o.frustumCulled || Object.prototype.hasOwnProperty.call(o, 'onBeforeRender') || o.customDepthMaterial || o.customDistanceMaterial) return;
+      if (!g || !g.attributes.position || Object.keys(g.morphAttributes).length || g.drawRange.count !== Infinity || g.drawRange.start !== 0) return;
+      const names = Object.keys(g.attributes).sort();
+      if (names.some((n) => { const a = g.attributes[n]; return a.isInterleavedBufferAttribute || a.normalized || !(a.array instanceof Float32Array); })) return;
+      const key = [m.uuid, o.castShadow, o.receiveShadow, o.renderOrder, o.layers.mask, names.map((n) => n + g.attributes[n].itemSize).join(',')].join('|');
+      let l = groups.get(key); if (!l) groups.set(key, l = []); l.push(o);
+    });
+    let before = 0, after = 0;
+    groups.forEach((list) => {
+      if (list.length < 2) return;
+      const names = Object.keys(list[0].geometry.attributes), parts = [], total = [0];
+      list.forEach((o) => {
+        const g = o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone();
+        g.clearGroups();   // material único: o renderer ignora groups
+        g.applyMatrix4(new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld));   // posição e normais (matriz normal) relativas a room
+        if (new THREE.Matrix4().multiplyMatrices(inv, o.matrixWorld).determinant() < 0) {   // espelhamento: inverte a ordem dos triângulos para a face não virar
+          names.forEach((n) => { const a = g.attributes[n], s = a.itemSize, d = a.array; for (let v = 0; v + 2 < a.count; v += 3) for (let k = 0; k < s; k++) { const i1 = (v + 1) * s + k, i2 = (v + 2) * s + k, t = d[i1]; d[i1] = d[i2]; d[i2] = t; } });
+        }
+        parts.push(g); total[0] += g.attributes.position.count;
+      });
+      const out = new THREE.BufferGeometry();
+      names.forEach((n) => {
+        const s = parts[0].attributes[n].itemSize, arr = new Float32Array(total[0] * s); let off = 0;
+        parts.forEach((g) => { arr.set(g.attributes[n].array, off); off += g.attributes[n].array.length; });
+        out.setAttribute(n, new THREE.BufferAttribute(arr, s));
+      });
+      parts.forEach((g) => g.dispose());
+      out.computeBoundingSphere(); out.computeBoundingBox();
+      const first = list[0], merged = new THREE.Mesh(out, first.material);
+      merged.name = 'fundido'; merged.castShadow = first.castShadow; merged.receiveShadow = first.receiveShadow; merged.renderOrder = first.renderOrder; merged.layers.mask = first.layers.mask;
+      const set = new Set(list);
+      list.forEach((o) => { o.children.slice().forEach((c) => { if (!set.has(c)) room.attach(c); }); });   // filhos que não foram fundidos (luzes, etc.) continuam na cena
+      list.forEach((o) => o.removeFromParent());
+      room.add(merged);   // no fim de room.children
+      before += list.length; after++;
+    });
+    console.info('fusão: ' + before + ' meshes viraram ' + after);
+  }
+
+  // 3) matrizes paradas: nada dentro de room se mexe depois da montagem (os projetos e o monitor ficam em scene, fora de room; floorGlow só muda de cor), então a matriz local é calculada uma vez
+  room.traverse((o) => { if (o !== room) { o.updateMatrix(); o.matrixAutoUpdate = false; } });
+}
+
 // ---------- câmera: paralaxe leve + voos ----------
 let W = 1, H = 1;
 // telas estreitas (celular em pé): em vez de abrir o campo de visão, a câmera recua até caber HALF_VIEW metros para cada lado do centro da mesa; o resto da mesa (até DESK_HALF) aparece quando a vista acompanha o dedo (panMax)
@@ -2285,7 +2380,7 @@ if (/debug/.test(location.search)) window.__hint = hintObjects;
 
 // ---------- animações: as do próprio modelo, ligadas no hover/foco ----------
 const awake = { drone: 0, bike: 0, robo: 0, toddy: 0 };
-let shadowHold = 120;   // quadros em que as sombras ainda são refeitas: os primeiros (a cena termina de assentar) e um pouco depois de cada movimento
+let shadowFrames = 0, shadowHold = 120;   // quadros em que as sombras ainda são refeitas: os primeiros (a cena termina de assentar) e um pouco depois de cada movimento
 let toddyHeld = 0;
 function animate(dt, t) {
   rgbTick(t);
@@ -2319,7 +2414,9 @@ function animate(dt, t) {
   let moving = !!active || toddyHeld > 0.002;
   for (const id in awake) { const sp = P[id].spin; if (awake[id] > 0.002 || Math.abs(sp.pitch) > 0.001 || Math.abs(Math.sin(sp.yaw / 2)) > 0.001) moving = true; }
   if (moving) shadowHold = Math.max(shadowHold, 20);
-  if (shadowHold > 0) { shadowHold--; renderer.shadowMap.needsUpdate = true; }
+  // em movimento, o mapa de sombra é refeito só em quadros alternados (metade do custo; a sombra atrasa no máximo 1 quadro). Os 120 primeiros quadros e os 20 depois que o movimento acaba (shadowHold) refazem todo quadro, então o estado final sempre é desenhado
+  shadowFrames++;
+  if (shadowHold > 0) { shadowHold--; if (!moving || shadowFrames <= 120 || (shadowFrames & 1)) renderer.shadowMap.needsUpdate = true; }
 }
 
 // ---------- exportação para o Blender (?export): a cena em .glb, organizada por seção ----------
