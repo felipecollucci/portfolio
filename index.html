@@ -64,7 +64,7 @@
   #sitefull { position: fixed; inset: 0; z-index: 50; visibility: hidden; opacity: 0; background: #141414; transition: opacity .5s ease, visibility 0s .5s; }
   #sitefull.show { visibility: visible; opacity: 1; transition: opacity .5s ease; }
   #card .go:focus-visible, #vgo:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
-  #sitefull .bar { position: absolute; left: 0; right: 0; bottom: 0; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 8px; height: calc(56px + env(safe-area-inset-bottom)); padding-bottom: env(safe-area-inset-bottom); font: inherit; font-size: 16px; font-weight: 500; letter-spacing: -.02em; color: var(--ink); background: var(--dark); border: 0; border-top: 1px solid var(--line); cursor: pointer; }
+  #sitefull .bar { position: absolute; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 1; display: flex; align-items: center; justify-content: center; gap: 8px; height: 52px; font: inherit; font-size: 16px; font-weight: 500; letter-spacing: -.02em; color: var(--dark); background: var(--ink); border: 0; border-radius: 14px; box-shadow: 0 8px 24px rgba(0,0,0,.45); cursor: pointer; }
   #sitefull .bar svg { width: 18px; height: 18px; }
   #sitefull iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #141414; }
   /* câmera livre (só para modelar): aparece com F no localhost ou com ?livre */
@@ -1905,13 +1905,27 @@ const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 // ---------- estado e interação ----------
 const state = { mode: 'desk', focus: null, hover: null };
-if (/debug/.test(location.search)) window.__d = { cam, HOME, P, scene, lampLight, V, state, THREE, SECTIONS, room, openFocus: (id) => openFocus(P[id].holder), openScreen };
+if (/debug/.test(location.search)) window.__d = { camera, cam, HOME, P, scene, lampLight, V, state, THREE, SECTIONS, room, openFocus: (id) => openFocus(P[id].holder), openScreen };
 const ray = new THREE.Raycaster();
 const overScreen = (e) => {
   ray.setFromCamera(new THREE.Vector2((e.clientX / W) * 2 - 1, -(e.clientY / H) * 2 + 1), camera);
   return ray.intersectObjects(solid, false)[0]?.object === screen;
 };
+const NEAR = 20;   // celular: folga em volta de cada objeto, em pixels (o dedo é mais largo que o mouse)
+const hbCorners = [0, 1, 2, 3, 4, 5, 6, 7].map(() => new THREE.Vector3());
+const nearTouch = (e) => {   // acha o objeto cujo retângulo na tela (com folga) contém o toque; entre vários, o menor (o monitor grande perde para o objeto pequeno na frente dele)
+  let best = null, area = Infinity;
+  for (const g of clickables) {
+    const hb = g.children.find((o) => o.userData.hitbox) || g, bb = new THREE.Box3().setFromObject(hb);
+    let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+    hbCorners.forEach((c, i) => { c.set(i & 1 ? bb.max.x : bb.min.x, i & 2 ? bb.max.y : bb.min.y, i & 4 ? bb.max.z : bb.min.z).project(camera); const px = (c.x + 1) / 2 * W, py = (1 - c.y) / 2 * H; x0 = Math.min(x0, px); x1 = Math.max(x1, px); y0 = Math.min(y0, py); y1 = Math.max(y1, py); });
+    if (e.clientX < x0 - NEAR || e.clientX > x1 + NEAR || e.clientY < y0 - NEAR || e.clientY > y1 + NEAR) continue;
+    const a = (x1 - x0 + 2 * NEAR) * (y1 - y0 + 2 * NEAR); if (a < area) { area = a; best = g; }
+  }
+  return best;
+};
 const pick = (e) => {
+  if (MOBILE) { const n = nearTouch(e); if (n) return n; }
   ray.setFromCamera(new THREE.Vector2((e.clientX / W) * 2 - 1, -(e.clientY / H) * 2 + 1), camera);
   const hits = ray.intersectObjects(clickables, true); if (!hits.length) return null;
   let o = hits[0].object; while (o && !o.userData.id) o = o.parent; return o;
