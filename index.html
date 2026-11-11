@@ -57,8 +57,8 @@
 
   /* monitor: o site fica dentro da tela 3D; #site só marca que o zoom terminou */
   #site { display: none; }
-  #sitefull { position: fixed; inset: 0; z-index: 50; display: none; background: #141414; }
-  #sitefull.show { display: block; }
+  #sitefull { position: fixed; inset: 0; z-index: 50; visibility: hidden; opacity: 0; background: #141414; transition: opacity .5s ease, visibility 0s .5s; }
+  #sitefull.show { visibility: visible; opacity: 1; transition: opacity .5s ease; }
   #card .go:focus-visible, #vgo:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
   #sitefull iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #141414; }
   /* câmera livre (só para modelar): aparece com F no localhost ou com ?livre */
@@ -1947,7 +1947,14 @@ function closeFocus() {
   flyTo(HOME.pos.clone(), HOME.look.clone(), 850, () => document.body.classList.remove('away'));
 }
 function openScreen(projectId) {
-  if (MOBILE) { noteOpened(); openFull(); return; }
+  if (MOBILE) {   // celular: a câmera se aproxima da tela do monitor e, no fim, o site de verdade surge em tela cheia (sem corte seco)
+    noteOpened(); if (fly) return;
+    if (state.mode === 'focus') { hideTag(); focusLight.userData.target = 0; document.body.classList.remove('focus', 'nodrag'); }
+    setHover(null); document.body.classList.add('away'); state.mode = 'screen'; state.focus = null; orbit = null;
+    if (!fullFrame.src) fullFrame.src = SITE_URL;   // já começa a carregar durante a aproximação
+    const t = Math.tan((camera.fov * Math.PI) / 360), d = Math.max(SCREEN.h / 2 / t, SCREEN.w / 2 / t / camera.aspect) / 0.9;
+    flyTo(V(0, SCREEN.y, SCREEN.z + d), V(0, SCREEN.y, SCREEN.z), 1100, openFull); return;
+  }
   hideTag(); focusLight.userData.target = 0; setHover(null); document.body.classList.add('away'); document.body.classList.remove('focus', 'nodrag'); noteOpened();
   state.mode = 'screen'; state.focus = null;
   const t = Math.tan((camera.fov * Math.PI) / 360), d = Math.max(SCREEN.h / 2 / t, SCREEN.w / 2 / t / camera.aspect) / SITE_FILL;   // a tela inteira cabe, com 5% de folga
@@ -1963,7 +1970,10 @@ full.innerHTML = '<iframe title="Portfólio de Felipe Collucci" allow="fullscree
 document.body.appendChild(full);
 const fullFrame = full.querySelector('iframe');
 function openFull() { if (state.mode === 'focus') closeFocus(); hideTag(); setHover(null); if (!fullFrame.src) fullFrame.src = SITE_URL; full.classList.add('show'); full.setAttribute('aria-hidden', 'false'); }
-function closeFull() { full.classList.remove('show'); full.setAttribute('aria-hidden', 'true'); }
+function closeFull() {   // o site some aos poucos e a câmera se afasta de volta para a mesa
+  full.classList.remove('show'); full.setAttribute('aria-hidden', 'true');
+  if (state.mode === 'screen') setTimeout(() => { flyTo(HOME.pos.clone(), HOME.look.clone(), 1000, () => { state.mode = 'desk'; document.body.classList.remove('away'); }); }, 250);
+}
 addEventListener('message', (e) => { if (full.classList.contains('show') && e.origin === new URL(SITE_URL).origin && e.data && (e.data.type === 'oficina' || e.data.type === 'escape')) closeFull(); });   // "Oficina" no cabeçalho do site também volta para a mesa
 // o site dentro do monitor avisa por postMessage quando o visitante clica em "Oficina" no cabeçalho: sai do zoom e volta à vista da mesa
 addEventListener('message', (e) => { if (e.origin === new URL(SITE_URL).origin && e.data && (e.data.type === 'oficina' || e.data.type === 'escape') && state.mode === 'screen' && site.classList.contains('show')) closeScreen(); });
