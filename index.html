@@ -763,7 +763,7 @@ key.castShadow = true; key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.
 Object.assign(key.shadow.camera, { left: -1.3, right: 1.3, top: 1.0, bottom: -0.6, near: 0.5, far: 6 });
 scene.add(key, key.target);
 const fill = new THREE.DirectionalLight(0x8aa0d0, 0.5); fill.position.set(1.8, 2.2, 1.2); scene.add(fill);
-const lampLight = new THREE.SpotLight(0xffc98a, 5, 2.4, 0.85, 0.8, 1.4); lampLight.castShadow = true; lampLight.shadow.mapSize.set(1024, 1024); lampLight.shadow.bias = -0.0005; scene.add(lampLight, lampLight.target);
+const lampLight = new THREE.SpotLight(0xffc98a, 5, 2.4, 0.85, 0.8, 1.4); lampLight.castShadow = true; lampLight.shadow.mapSize.set(1024, 1024); lampLight.shadow.bias = -0.0005; lampLight.shadow.normalBias = 0.004; scene.add(lampLight, lampLight.target);
 const glow = new THREE.PointLight(0x9fb4ff, 0.9, 1.4, 1.4); glow.position.set(0, 1.0, -0.15); scene.add(glow);
 const back = new THREE.PointLight(0x8fa6e8, 1.6, 1.0, 1.2); back.position.set(-0.1, 1.15, -0.4); scene.add(back);
 const focusLight = new THREE.PointLight(0xfff2e0, 0, 0.7, 1.5); scene.add(focusLight);
@@ -859,7 +859,7 @@ const SP = { r: 0.06, w: 0.045 };
 (() => { // planta em vaso branco
   const g = group(room, -0.62, 1.092, -0.34);
   lathe([[0, 0], [0.026, 0], [0.032, 0.008], [0.036, 0.06], [0.04, 0.066], [0.036, 0.068], [0.03, 0.062], [0, 0.062]], mat(C.white, { roughness: 0.4 }), g);
-  cyl(0.031, 0.031, 0.004, mat(0x3a2a20, { roughness: 1 }), g, 0, 0.06, 0, 24);
+  cyl(0.031, 0.031, 0.004, mat(0x3a2a20, { roughness: 1 }), g, 0, 0.0635, 0, 24);   // um pouco acima do fundo do vaso (antes coincidia com ele e piscava)
   const leaf = new THREE.Shape(); leaf.moveTo(0, 0); leaf.quadraticCurveTo(0.012, 0.04, 0, 0.1); leaf.quadraticCurveTo(-0.012, 0.04, 0, 0);
   const lg = new THREE.ShapeGeometry(leaf, 8);
   for (let i = 0; i < 11; i++) { const l = add(lg, mat(i % 2 ? 0x4f8f5f : 0x3e7a50, { side: THREE.DoubleSide, roughness: 0.6 }), g, 0, 0.06, 0);
@@ -1405,7 +1405,7 @@ mark('Prateleiras (potes e caixas)');
   [[-0.905, -0.305, 0x1d3a6e, 0.008, 0.016], [-0.887, -0.298, 0x1d3a6e, 0.0065, 0.013], [-0.922, -0.296, 0x7a1f1f, 0.0055, 0.011]].forEach(([x, z, col, r, h]) => {
     const g = group(room, x, Y, z);
     cyl(r, r, h, mat(col, { roughness: 0.4 }), g, 0, h / 2 + 0.003, 0, 20);
-    cyl(r * 0.99, r * 0.99, h * 0.18, mat(0xc9ccd2, METAL), g, 0, h * 0.91 + 0.003, 0, 20);
+    cyl(r * 0.97, r * 0.97, h * 0.2, mat(0xc9ccd2, METAL), g, 0, h * 0.915 + 0.003, 0, 20);   // topo um pouco acima do corpo (antes coincidia e piscava)
     [-1, 1].forEach((s) => cyl(0.0004, 0.0004, 0.01, mat(C.steel, METAL), g, s * r * 0.4, 0.0015, 0, 4));
   });
 })();
