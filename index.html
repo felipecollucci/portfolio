@@ -2097,16 +2097,23 @@ function closeFocus() {
   hideTag(); focusLight.userData.target = 0; state.mode = 'desk'; state.focus = null; orbit = null; drag = null; document.body.classList.remove('dragging'); document.body.classList.remove('focus', 'nodrag');
   flyTo(HOME.pos.clone(), HOME.look.clone(), 850, () => document.body.classList.remove('away'));
 }
+// troca a página do site no monitor: a tela escurece, a página nova carrega e aparece (a animação de entrada do Framer roda enquanto a câmera ainda se aproxima)
+let siteFade = null;
+function loadSite(url) {
+  clearTimeout(siteFade); siteIframe.style.transition = 'opacity .35s'; siteIframe.style.opacity = '0';
+  const show = () => { clearTimeout(siteFade); siteFade = setTimeout(() => { siteIframe.style.opacity = '1'; }, 150); };
+  siteFade = setTimeout(() => { siteIframe.addEventListener('load', show, { once: true }); siteIframe.src = url; siteFade = setTimeout(() => { siteIframe.style.opacity = '1'; }, 4000); }, 350);   // 350 ms de espera: a câmera já começou a andar; 4 s é a segurança se a página não avisar que carregou
+}
 function openScreen(projectId) {
   if (MOBILE) {   // celular: a câmera se aproxima da tela do monitor e, no fim, o site de verdade surge em tela cheia (sem corte seco)
     noteOpened(); if (fly) return;
     if (state.mode === 'focus') { hideTag(); focusLight.userData.target = 0; document.body.classList.remove('focus', 'nodrag'); }
     setHover(null); document.body.classList.add('away'); state.mode = 'screen'; state.focus = null; orbit = null;
-    siteTarget = SITE_SLUG[projectId] ? projectId : null; if (fullFrame.src !== curUrl()) fullFrame.src = curUrl();   // já começa a carregar durante a aproximação (a página do projeto, se veio de "ver projeto")
+    siteTarget = SITE_SLUG[projectId] ? projectId : null; if (siteTarget || fullFrame.src !== curUrl()) { const u = curUrl(); setTimeout(() => { fullFrame.src = u; }, siteTarget ? 450 : 0); }   // começa a carregar durante a aproximação; com "ver projeto" sempre recarrega na página do projeto, um pouco depois do início para a animação do Framer ainda ser vista
     const t = Math.tan((camera.fov * Math.PI) / 360), d = Math.max(SCREEN.h / 2 / t, SCREEN.w / 2 / t / camera.aspect) / 0.9;
     flyTo(V(0, SCREEN.y, SCREEN.z + d), V(0, SCREEN.y, SCREEN.z), 1100, openFull); return;
   }
-  siteTarget = SITE_SLUG[projectId] ? projectId : null; if (siteIframe.src !== curUrl()) siteIframe.src = curUrl();   // "ver projeto" abre a página daquele projeto dentro do monitor; clicar no monitor abre a página inicial
+  siteTarget = SITE_SLUG[projectId] ? projectId : null; if (siteTarget || siteIframe.src !== curUrl()) loadSite(curUrl());   // "ver projeto" sempre recarrega na página daquele projeto (mesmo que o visitante tenha navegado no monitor); clicar no monitor volta à página inicial só se o último abrir foi um projeto
   hideTag(); focusLight.userData.target = 0; setHover(null); document.body.classList.add('away'); document.body.classList.remove('focus', 'nodrag'); noteOpened();
   state.mode = 'screen'; state.focus = null;
   const t = Math.tan((camera.fov * Math.PI) / 360), d = Math.max(SCREEN.h / 2 / t, SCREEN.w / 2 / t / camera.aspect) / SITE_FILL;   // a tela inteira cabe, com 5% de folga
