@@ -130,7 +130,7 @@ if (/perf/.test(location.search)) (function () {
 // Tela de entrada. O escritório começa a carregar na hora, por trás dela. Quando a cena fica pronta, aparece o botão de começar.
 // Celular: o sensor de movimento é pedido sozinho já no carregamento; onde o sistema exige um toque antes (iPhone, regra da Apple), o toque em "começar" faz o pedido.
 (() => {
-  const D = window.DeviceOrientationEvent, veil = document.getElementById('veil'), msg = document.getElementById('vmsg'), btn = document.getElementById('vgo');
+  const D = window.DeviceMotionEvent, veil = document.getElementById('veil'), msg = document.getElementById('vmsg'), btn = document.getElementById('vgo');
   const coarse = matchMedia('(pointer: coarse)').matches, ask = !!(D && typeof D.requestPermission === 'function') && coarse;
   // idioma: o que a pessoa escolheu antes; senão, o do navegador (português ou inglês)
   const TXT = {
@@ -2019,18 +2019,22 @@ const pick = (e) => {
   let o = hits[0].object; while (o && !o.userData.id) o = o.parent; return o;
 };
 const setHover = (g) => { if (g === state.hover) return; state.hover = g; document.body.classList.toggle('hover', !!g); };
-// celular em pé: a vista acompanha a INCLINAÇÃO do aparelho (giroscópio) em vez do dedo. A posição em que o celular estava ao começar vira o centro; o limite é GYRO_RANGE graus para cada lado (depois disso a vista para na borda da mesa). O toque continua só para clicar nos objetos.
+// celular em pé: a vista acompanha a INCLINAÇÃO do aparelho em vez do dedo. Lê a direção da GRAVIDADE (acelerômetro), não os ângulos de orientação: girar o corpo na cadeira não move a vista, só inclinar o aparelho. A posição em que o celular estava ao começar vira o centro; o limite é GYRO_RANGE graus para cada lado (depois disso a vista para na borda da mesa). O toque continua só para clicar nos objetos.
 const GYRO_RANGE = 20;   // graus de inclinação que levam a vista do centro até a borda
 const gyro = { on: false, g0: null, b0: null };
 const gyroClamp = (v) => Math.max(-1, Math.min(1, v));
+const wrapDeg = (d) => ((d + 540) % 360) - 180;   // diferença entre dois ângulos sem saltar de +180 para -180
 const onTilt = (e) => {
-  if (e.gamma == null || e.beta == null || !isNarrow()) return;   // computador não tem sensor; no celular deitado vale o mouse/dedo de sempre
-  if (gyro.g0 === null) { gyro.g0 = e.gamma; gyro.b0 = e.beta; }
+  const a = e.accelerationIncludingGravity;
+  if (!a || a.x == null || a.y == null || a.z == null || !isNarrow()) return;   // computador não tem sensor; no celular deitado vale o mouse/dedo de sempre
+  const roll = Math.atan2(a.x, a.y) * 180 / Math.PI;   // topo do aparelho para os lados (volante)
+  const pitch = Math.atan2(a.z, a.y) * 180 / Math.PI;   // topo do aparelho para frente/trás (cabecear)
+  if (gyro.g0 === null) { gyro.g0 = roll; gyro.b0 = pitch; }
   gyro.on = true;
-  mouseN.set(-gyroClamp((e.gamma - gyro.g0) / GYRO_RANGE), -gyroClamp((e.beta - gyro.b0) / (GYRO_RANGE * 1.5)));   // direção invertida (pedido do Felipe) | gamma: inclinar para os lados; beta: inclinar para frente/trás
+  mouseN.set(-gyroClamp(wrapDeg(roll - gyro.g0) / GYRO_RANGE), -gyroClamp(wrapDeg(pitch - gyro.b0) / (GYRO_RANGE * 1.5)));   // direção invertida (pedido do Felipe) | roll: inclinar para os lados; pitch: inclinar para frente/trás
 };
 const startTilt = () => {   // o sensor fica sempre escutando: onde o sistema exige licença (iPhone), o pedido é feito na tela de carregamento (script do #veil) e os movimentos só chegam depois que a pessoa aceita
-  if (window.DeviceOrientationEvent) addEventListener('deviceorientation', onTilt);
+  if (window.DeviceMotionEvent) addEventListener('devicemotion', onTilt);
 };
 if (matchMedia('(pointer: coarse)').matches) startTilt();
 addEventListener('resize', () => { gyro.g0 = null; });   // girou o celular ou mudou a tela: recalibra o centro
