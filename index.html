@@ -85,9 +85,13 @@ if (/perf/.test(location.search)) (function () {
   #card .meta { font-size: 13px; font-weight: 500; color: var(--ink-60); }
   #card h3 { margin: 10px 0 0; font-size: 34px; line-height: 1.02; font-weight: 700; letter-spacing: -.04em; }
   #card .desc { margin: 14px 0 0; font-size: 16px; line-height: 1.45; letter-spacing: -.01em; color: rgba(236,232,223,.82); }
-  #card .row { display: flex; align-items: center; gap: 16px; margin-top: 22px; }
+  #card .row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin-top: 22px; }
   #card .go, #vgo { font: inherit; font-size: 16px; font-weight: 500; letter-spacing: -.02em; color: var(--dark); background: var(--ink); border: 0; border-radius: 4px; padding: 12px 18px; cursor: pointer; transition: opacity .2s; }
   #card .go:hover, #vgo:hover { opacity: .85; }
+  #card .go[hidden] { display: none; }
+  #card .next { font: inherit; font-size: 16px; font-weight: 500; letter-spacing: -.02em; color: var(--ink); background: transparent; border: 1px solid var(--line); border-radius: 4px; padding: 11px 16px; cursor: pointer; transition: border-color .2s, background .2s; }
+  #card .next:hover { border-color: var(--ink-60); background: rgba(236,232,223,.08); }
+  #card .next:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
   #card .drag { font-size: 13px; color: var(--ink-60); }
   body.narrow #card { left: 16px; right: 16px; top: auto; bottom: calc(16px + env(safe-area-inset-bottom)); width: auto; transform: none; padding: 22px 22px 20px; }
   body.narrow #card h3 { font-size: 30px; }
@@ -112,7 +116,7 @@ if (/perf/.test(location.search)) (function () {
   <div class="meta"></div>
   <h3 class="t"></h3>
   <p class="desc"></p>
-  <div class="row"><button type="button" class="go"></button><span class="drag"></span></div>
+  <div class="row"><button type="button" class="go"></button><button type="button" class="next"></button><span class="drag"></span></div>
 </div>
 <div id="site" aria-hidden="true"></div>
 <div id="free"><b>câmera livre</b> · botão do meio move · Shift + botão do meio gira · rodinha aproxima · H volta ao início · F ou Esc sai<br><code class="xyz"></code></div>
@@ -134,8 +138,8 @@ if (/perf/.test(location.search)) (function () {
   const coarse = matchMedia('(pointer: coarse)').matches, ask = !!(D && typeof D.requestPermission === 'function') && coarse;
   // idioma: o que a pessoa escolheu antes; senão, o do navegador (português ou inglês)
   const TXT = {
-    pt: { loading: 'montando a oficina…', ready: 'oficina pronta', s1m: 'mova o mouse para olhar em volta', s1t: 'incline o celular para olhar em volta', s2m: 'clique nos objetos para ver os projetos', s2t: 'toque nos objetos para ver os projetos', s3m: 'clique no monitor para abrir o portfólio', s3t: 'toque no monitor para abrir o portfólio', gom: 'clique para começar', got: 'toque para começar', view: 'ver projeto', spin: 'arraste para girar', orbit: 'arraste para girar em volta', back: 'voltar para a oficina', frame: 'Portfólio de Felipe Collucci' },
-    en: { loading: 'building the workshop…', ready: 'workshop ready', s1m: 'move the mouse to look around', s1t: 'tilt your phone to look around', s2m: 'click the objects to see the projects', s2t: 'tap the objects to see the projects', s3m: 'click the monitor to open the portfolio', s3t: 'tap the monitor to open the portfolio', gom: 'click to start', got: 'tap to start', view: 'view project', spin: 'drag to rotate', orbit: 'drag to look around', back: 'back to the workshop', frame: 'Felipe Collucci\'s portfolio' },
+    pt: { loading: 'montando a oficina…', ready: 'oficina pronta', s1m: 'mova o mouse para olhar em volta', s1t: 'incline o celular para olhar em volta', s2m: 'clique nos objetos para ver os projetos', s2t: 'toque nos objetos para ver os projetos', s3m: 'clique no monitor para abrir o portfólio', s3t: 'toque no monitor para abrir o portfólio', gom: 'clique para começar', got: 'toque para começar', view: 'ver projeto', next: 'próximo projeto', spin: 'arraste para girar', orbit: 'arraste para girar em volta', back: 'voltar para a oficina', frame: 'Portfólio de Felipe Collucci' },
+    en: { loading: 'building the workshop…', ready: 'workshop ready', s1m: 'move the mouse to look around', s1t: 'tilt your phone to look around', s2m: 'click the objects to see the projects', s2t: 'tap the objects to see the projects', s3m: 'click the monitor to open the portfolio', s3t: 'tap the monitor to open the portfolio', gom: 'click to start', got: 'tap to start', view: 'view project', next: 'next project', spin: 'drag to rotate', orbit: 'drag to look around', back: 'back to the workshop', frame: 'Felipe Collucci\'s portfolio' },
   };
   let saved = null; try { saved = localStorage.getItem('lang'); } catch (e) {}
   const I = window.__i18n = { lang: saved === 'pt' || saved === 'en' ? saved : ((navigator.language || '').toLowerCase().startsWith('pt') ? 'pt' : 'en'), TXT, subs: [], t: (k) => TXT[I.lang][k], on: (fn) => I.subs.push(fn) };
@@ -945,6 +949,11 @@ const screen = add(new THREE.PlaneGeometry(SCREEN.w, SCREEN.h), new THREE.MeshBa
 const SITE_URL = 'https://felipecollucci.framer.website', siteUrl = () => SITE_URL + (I18N.lang === 'pt' ? '/pt/?lang=pt' : '/?lang=en'), SITE_FILL = 0.95, SITE_SCROLL = 2.2;   // o ?lang= faz o site respeitar a escolha daqui (senão o Framer redireciona pelo idioma do navegador); SITE_FILL: fração da janela que o site ocupa quando ampliado
 const K = 1000, cssScene = new THREE.Scene(), cssRenderer = new CSS3DRenderer(), cssCamera = new THREE.PerspectiveCamera(40, 1, 0.02 * K, 50 * K);
 cssRenderer.domElement.id = 'css3d'; document.body.insertBefore(cssRenderer.domElement, canvas);
+// cada projeto da cena tem a própria página no site do Framer; o Toddy ainda não tem (sem página, a ficha não mostra "ver projeto")
+const SITE_SLUG = { drone: 'drone-autonomo', bike: 'arcus', robo: 'combate-robos' };
+let siteTarget = null;   // projeto aberto no monitor (null = página inicial do site)
+const projectUrl = (id) => SITE_URL + (I18N.lang === 'pt' ? '/pt' : '') + '/work/projects/' + SITE_SLUG[id] + '?lang=' + I18N.lang;
+const curUrl = () => (siteTarget && SITE_SLUG[siteTarget] ? projectUrl(siteTarget) : siteUrl());
 const siteFrame = document.createElement('div'); siteFrame.className = 'screen-frame'; siteFrame.style.cssText = 'width:1600px;height:1000px';
 const MOBILE = matchMedia('(pointer: coarse)').matches; if (MOBILE) document.body.classList.add('touch');   // celular ou tablet (tela de toque)
 const siteIframe = document.createElement('iframe'); if (!MOBILE) siteIframe.src = siteUrl(); siteIframe.title = I18N.t('frame'); siteIframe.allow = 'fullscreen; autoplay'; siteFrame.appendChild(siteIframe);
@@ -2018,7 +2027,12 @@ const pick = (e) => {
   const hits = ray.intersectObjects(clickables, true); if (!hits.length) return null;
   let o = hits[0].object; while (o && !o.userData.id) o = o.parent; return o;
 };
-const setHover = (g) => { if (g === state.hover) return; state.hover = g; document.body.classList.toggle('hover', !!g); };
+const setHover = (g) => { if (g === state.hover) return; state.hover = g; document.body.classList.toggle('hover', !!g); if (state.mode === 'desk') { if (g && P[g.userData.id]) placeFocusLight(g); else focusLight.userData.target = 0; } };   // passar o mouse acende a mesma luz de quando o projeto é selecionado
+function placeFocusLight(g) {   // a luz que acende o projeto: usada ao passar o mouse e ao abrir o destaque
+  const id = g.userData.id, m = P[id];
+  if (id === 'toddy') { const C = m.at.clone().add(TODDY_HELD), fw = V(Math.sin(m.yaw), 0, Math.cos(m.yaw)); focusLight.position.copy(C).addScaledVector(fw, 0.25).add(V(0.05, 0.1, 0)); focusLight.userData.target = 0.35; return; }
+  const c = new THREE.Box3().setFromObject(g).getCenter(V()); focusLight.position.copy(c).add(V(0.05, 0.2, 0.3)); focusLight.userData.target = 1.3;
+}
 // celular em pé: a vista acompanha a INCLINAÇÃO do aparelho em vez do dedo. Lê a direção da GRAVIDADE (acelerômetro), não os ângulos de orientação: girar o corpo na cadeira não move a vista, só inclinar o aparelho. A posição em que o celular estava ao começar vira o centro; o limite é GYRO_RANGE graus para cada lado (depois disso a vista para na borda da mesa). O toque continua só para clicar nos objetos.
 const GYRO_RANGE = 20;   // graus de inclinação que levam a vista do centro até a borda
 const gyro = { on: false, g0: null, b0: null };
@@ -2060,11 +2074,11 @@ function openFocus(g) {
     if (narrow) { const td = Math.max(0.35, 0.0735 / (tf * camera.aspect)), tl = 0.4 * td * tf;
       flyTo(C.clone().addScaledVector(fw, td).add(V(0, 0.035 - tl, 0)), C.clone().add(V(0, -tl, 0)), 950, () => showTag(g)); }
     else flyTo(C.clone().addScaledVector(fw, 0.44).add(V(0, 0.035, 0)), C.clone().addScaledVector(rt, 0.08), 950, () => showTag(g));
-    focusLight.position.copy(C).addScaledVector(fw, 0.25).add(V(0.05, 0.1, 0)); focusLight.userData.target = 0.35; return;
+    placeFocusLight(g); return;
   }
   const from0 = c.clone().add(V(0, d * F.up * 0.45, d)), from = from0.clone().add(V(0, -lift, 0));
   flyTo(from, c.clone().add(V(narrow ? 0 : r * 0.42, -lift, 0)), 950, () => { showTag(g); if (F.drag === 'orbit') { const o = from0.clone().sub(c); orbit = { c, side: narrow ? 0 : r * 0.42, lift, R: o.length(), el0: Math.asin(o.y / o.length()), az: 0, el: 0, azT: 0, elT: 0 }; } });
-  focusLight.position.copy(c).add(V(0.05, 0.2, 0.3)); focusLight.userData.target = 1.3;
+  placeFocusLight(g);
 }
 function showTag(g) {
   const p = proj(g.userData.id);
@@ -2073,6 +2087,8 @@ function showTag(g) {
   tag.querySelector('.desc').textContent = p.desc;
   const dr = FOCUS[g.userData.id].drag; tag.querySelector('.drag').textContent = dr === 'none' ? '' : I18N.t(dr === 'orbit' ? 'orbit' : 'spin');
   tag.querySelector('.go').textContent = I18N.t('view');
+  tag.querySelector('.go').hidden = !SITE_SLUG[g.userData.id];   // projeto sem página no site (Toddy): sem "ver projeto"
+  tag.querySelector('.next').textContent = I18N.t('next') + ' →';
   tag.classList.add('show');
 }
 function hideTag() { tag.classList.remove('show'); }
@@ -2086,10 +2102,11 @@ function openScreen(projectId) {
     noteOpened(); if (fly) return;
     if (state.mode === 'focus') { hideTag(); focusLight.userData.target = 0; document.body.classList.remove('focus', 'nodrag'); }
     setHover(null); document.body.classList.add('away'); state.mode = 'screen'; state.focus = null; orbit = null;
-    if (!fullFrame.src) fullFrame.src = siteUrl();   // já começa a carregar durante a aproximação
+    siteTarget = SITE_SLUG[projectId] ? projectId : null; if (fullFrame.src !== curUrl()) fullFrame.src = curUrl();   // já começa a carregar durante a aproximação (a página do projeto, se veio de "ver projeto")
     const t = Math.tan((camera.fov * Math.PI) / 360), d = Math.max(SCREEN.h / 2 / t, SCREEN.w / 2 / t / camera.aspect) / 0.9;
     flyTo(V(0, SCREEN.y, SCREEN.z + d), V(0, SCREEN.y, SCREEN.z), 1100, openFull); return;
   }
+  siteTarget = SITE_SLUG[projectId] ? projectId : null; if (siteIframe.src !== curUrl()) siteIframe.src = curUrl();   // "ver projeto" abre a página daquele projeto dentro do monitor; clicar no monitor abre a página inicial
   hideTag(); focusLight.userData.target = 0; setHover(null); document.body.classList.add('away'); document.body.classList.remove('focus', 'nodrag'); noteOpened();
   state.mode = 'screen'; state.focus = null;
   const t = Math.tan((camera.fov * Math.PI) / 360), d = Math.max(SCREEN.h / 2 / t, SCREEN.w / 2 / t / camera.aspect) / SITE_FILL;   // a tela inteira cabe, com 5% de folga
@@ -2107,9 +2124,9 @@ full.innerHTML = '<iframe allow="fullscreen; autoplay"></iframe><button type="bu
 document.body.appendChild(full);
 const fullFrame = full.querySelector('iframe'), fullBar = full.querySelector('.bar');
 full.querySelector('.bar').addEventListener('click', () => closeFull());
-const paintLang = () => { fullFrame.title = I18N.t('frame'); siteIframe.title = I18N.t('frame'); fullBar.querySelector('span').textContent = I18N.t('back'); fullBar.setAttribute('aria-label', I18N.t('back')); tag.querySelector('.go').textContent = I18N.t('view'); const u = siteUrl(); if (fullFrame.src && fullFrame.src !== u) fullFrame.src = u; if (!MOBILE && siteIframe.src !== u) siteIframe.src = u; };
+const paintLang = () => { fullFrame.title = I18N.t('frame'); siteIframe.title = I18N.t('frame'); fullBar.querySelector('span').textContent = I18N.t('back'); fullBar.setAttribute('aria-label', I18N.t('back')); tag.querySelector('.go').textContent = I18N.t('view'); tag.querySelector('.next').textContent = I18N.t('next') + ' →'; const u = curUrl(); if (fullFrame.src && fullFrame.src !== u) fullFrame.src = u; if (!MOBILE && siteIframe.src !== u) siteIframe.src = u; };
 I18N.on(paintLang); paintLang();
-function openFull() { if (state.mode === 'focus') closeFocus(); hideTag(); setHover(null); if (!fullFrame.src) fullFrame.src = siteUrl(); full.classList.add('show'); full.setAttribute('aria-hidden', 'false'); }
+function openFull() { if (state.mode === 'focus') closeFocus(); hideTag(); setHover(null); if (!fullFrame.src) fullFrame.src = curUrl(); full.classList.add('show'); full.setAttribute('aria-hidden', 'false'); }
 function closeFull() {   // o site some aos poucos e a câmera se afasta de volta para a mesa
   full.classList.remove('show'); full.setAttribute('aria-hidden', 'true');
   if (state.mode === 'screen') setTimeout(() => { flyTo(HOME.pos.clone(), HOME.look.clone(), 1000, () => { state.mode = 'desk'; document.body.classList.remove('away'); }); }, 250);
@@ -2151,6 +2168,12 @@ canvas.addEventListener('click', (e) => {
   if (g.userData.id === 'monitor') openScreen(); else openFocus(g);
 });
 tag.querySelector('.go').addEventListener('click', () => { if (state.focus) openScreen(state.focus.userData.id); });
+const FOCUS_ORDER = ['drone', 'bike', 'robo', 'toddy'];   // sentido horário visto da cadeira: prateleira esquerda, prateleira direita, mesa direita, mesa esquerda
+tag.querySelector('.next').addEventListener('click', () => {
+  if (state.mode !== 'focus' || !state.focus || fly) return;
+  const id = FOCUS_ORDER[(FOCUS_ORDER.indexOf(state.focus.userData.id) + 1) % FOCUS_ORDER.length];
+  hideTag(); drag = null; document.body.classList.remove('dragging'); openFocus(P[id].holder);
+});
 addEventListener('keydown', (e) => { if (e.key !== 'Escape') return; if (state.mode === 'focus') closeFocus(); else if (state.mode === 'screen' && site.classList.contains('show')) closeScreen(); });
 
 // ---------- câmera livre, com os controles do Fusion 360 (ferramenta de modelagem, não aparece para visitantes) ----------
