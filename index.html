@@ -20,9 +20,9 @@
   #veil { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: var(--dark); color: var(--ink); transition: opacity .9s ease; }
   #veil.off { opacity: 0; pointer-events: none; }
   #veil .vbox { width: min(460px, 100% - 48px); }
-  #lang { position: absolute; top: max(16px, env(safe-area-inset-top)); right: 20px; display: flex; gap: 2px; padding: 3px; border: 1px solid var(--line); border-radius: 4px; }
-  #lang button { font: inherit; font-size: 13px; font-weight: 500; letter-spacing: .02em; color: var(--ink-60); background: none; border: 0; border-radius: 3px; padding: 6px 10px; cursor: pointer; }
-  #lang button[aria-pressed="true"] { color: var(--dark); background: var(--ink); }
+  #lang { display: flex; justify-content: flex-start; align-items: center; gap: 4px; margin-top: 6px; font-size: 14px; color: var(--ink-60); }
+  #lang button { font: inherit; letter-spacing: -.01em; color: var(--ink-60); background: none; border: 0; padding: 8px 4px; cursor: pointer; }
+  #lang button[aria-pressed="true"] { color: var(--ink); text-decoration: underline; text-underline-offset: 4px; }
   #lang button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
   .vstatus { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 500; color: var(--ink-60); }
   .vstatus .gear { width: 20px; height: 20px; color: var(--ink); animation: turn 2.4s linear infinite; }
@@ -83,7 +83,7 @@
 </div>
 <div id="site" aria-hidden="true"></div>
 <div id="free"><b>câmera livre</b> · botão do meio move · Shift + botão do meio gira · rodinha aproxima · H volta ao início · F ou Esc sai<br><code class="xyz"></code></div>
-<div id="veil"><div id="lang" role="group" aria-label="Idioma / Language"><button type="button" data-l="pt" aria-pressed="false">PT</button><button type="button" data-l="en" aria-pressed="false">EN</button></div><div class="vbox">
+<div id="veil"><div class="vbox">
   <div class="vstatus"><svg class="gear" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="3.73 3.73"/><circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="4"/></svg><span id="vmsg"></span></div>
   <ol class="vsteps">
     <li><span>01</span><b data-k="s1"></b></li>
@@ -91,6 +91,7 @@
     <li><span>03</span><b data-k="s3"></b></li>
   </ol>
   <div class="vfoot"><div class="vbar"></div><button id="vgo" type="button" hidden data-k="go"></button></div>
+  <div id="lang" role="group" aria-label="Idioma / Language"><button type="button" data-l="pt" aria-pressed="false">Português</button><span aria-hidden="true">·</span><button type="button" data-l="en" aria-pressed="false">English</button></div>
 </div></div>
 <script>
 // Tela de entrada. O escritório começa a carregar na hora, por trás dela. Quando a cena fica pronta, aparece o botão de começar.
