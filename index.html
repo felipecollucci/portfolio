@@ -2096,7 +2096,8 @@ const pulseMats = (g) => { const set = new Set(); g.traverse((o) => { (Array.isA
 function hintObjects() {
   if (state.mode !== 'desk' || pulses.length) return;
   const now = performance.now();
-  [...clickables].sort((a, b) => a.position.x - b.position.x).forEach((g, i) => pulses.push({ g, mats: g.userData.pm || (g.userData.pm = pulseMats(g)), t0: now + i * 380 }));
+  const order = [...clickables].sort(() => Math.random() - 0.5); let at = now;   // ordem sorteada, com intervalos diferentes entre um e outro
+  order.forEach((g) => { pulses.push({ g, mats: g.userData.pm || (g.userData.pm = pulseMats(g)), t0: at }); at += 250 + Math.random() * 700; });
 }
 function pulseTick(t) {
   for (let i = pulses.length - 1; i >= 0; i--) {
@@ -2109,7 +2110,7 @@ function pulseTick(t) {
 }
 let idleT = null, opened = false;
 const noteOpened = () => { opened = true; clearTimeout(idleT); };
-window.__veil.onStart = () => { setTimeout(hintObjects, 1000); idleT = setTimeout(() => { if (!opened) hintObjects(); }, 16000); };
+window.__veil.onStart = () => { setTimeout(hintObjects, 3000); idleT = setTimeout(() => { if (!opened) hintObjects(); }, 16000); };
 if (/debug/.test(location.search)) window.__hint = hintObjects;
 
 // ---------- animações: as do próprio modelo, ligadas no hover/foco ----------
