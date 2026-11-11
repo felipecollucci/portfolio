@@ -1945,7 +1945,7 @@ const onTilt = (e) => {
   if (e.gamma == null || e.beta == null || !isNarrow()) return;   // computador não tem sensor; no celular deitado vale o mouse/dedo de sempre
   if (gyro.g0 === null) { gyro.g0 = e.gamma; gyro.b0 = e.beta; }
   gyro.on = true;
-  mouseN.set(gyroClamp((e.gamma - gyro.g0) / GYRO_RANGE), gyroClamp((e.beta - gyro.b0) / (GYRO_RANGE * 1.5)));   // gamma: inclinar para os lados; beta: inclinar para frente/trás
+  mouseN.set(-gyroClamp((e.gamma - gyro.g0) / GYRO_RANGE), -gyroClamp((e.beta - gyro.b0) / (GYRO_RANGE * 1.5)));   // direção invertida (pedido do Felipe) | gamma: inclinar para os lados; beta: inclinar para frente/trás
 };
 const startTilt = () => {   // o sensor fica sempre escutando: onde o sistema exige licença (iPhone), o pedido é feito na tela de carregamento (script do #veil) e os movimentos só chegam depois que a pessoa aceita
   if (window.DeviceOrientationEvent) addEventListener('deviceorientation', onTilt);
@@ -2235,7 +2235,42 @@ async function exportGLB() {
 // ---------- laço ----------
 const clock = new THREE.Clock();
 let first = true;
+// ---------- modo de teste de desempenho (?perf): painel no canto com fps, tempo de cada quadro, desenhos por quadro e dados do aparelho. Só liga com ?perf no endereço; fora disso não existe e não custa nada ----------
+const perf = /perf/.test(location.search) ? (() => {
+  const box = document.createElement('pre'); box.id = 'perf';
+  box.style.cssText = 'position:fixed;left:6px;top:6px;z-index:99999;margin:0;padding:6px 8px;font:11px/1.35 ui-monospace,Menlo,Consolas,monospace;color:#d7ffd0;background:rgba(0,0,0,.78);border-radius:6px;pointer-events:none;white-space:pre;max-width:96vw;overflow:hidden';
+  document.body.appendChild(box);
+  const gl = renderer.getContext(), ext = gl.getExtension('WEBGL_debug_renderer_info'), gpu = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : 'não informado';
+  const N = 120, dts = [], cpus = []; let last = 0, ready = null, shown = 0;
+  const q = (a, p) => { const b = a.slice().sort((x, y) => x - y); return b[Math.min(b.length - 1, Math.floor(b.length * p))]; };
+  const f1 = (v) => (v == null ? '-' : v.toFixed(1));
+  const nav = navigator, mem = performance.memory;
+  const ua = (nav.userAgent.match(/\(([^)]*)\)/) || [0, '?'])[1].slice(0, 60);
+  return {
+    ready() { ready = performance.now(); },
+    tick(t, cpu) {
+      if (last) { const d = t - last; if (d < 1000) { dts.push(d); cpus.push(cpu); if (dts.length > N) { dts.shift(); cpus.shift(); } } }
+      last = t;
+      if (t - shown < 500 || dts.length < 10) return; shown = t;
+      const mean = dts.reduce((a, b) => a + b, 0) / dts.length, i = renderer.info.render, pr = renderer.getPixelRatio();
+      box.textContent = [
+        'PERF  fps ' + f1(1000 / mean) + '   (últimos ' + dts.length + ' quadros)',
+        'quadro: mediana ' + f1(q(dts, 0.5)) + ' ms · pior 5% ' + f1(q(dts, 0.95)) + ' ms · máx ' + f1(Math.max(...dts)) + ' ms',
+        'engasgos (>33 ms): ' + dts.filter((d) => d > 33).length + ' de ' + dts.length,
+        'trabalho do JS por quadro: ' + f1(q(cpus, 0.5)) + ' ms (mediana)',
+        'desenhos por quadro: ' + i.calls + ' · triângulos: ' + Math.round(i.triangles / 1000) + ' mil',
+        'tela: ' + innerWidth + '×' + innerHeight + ' · escala ' + pr + ' → ' + canvas.width + '×' + canvas.height + ' px',
+        'pronto em: ' + (ready == null ? 'carregando…' : (ready / 1000).toFixed(1) + ' s') + ' · modo: ' + state.mode,
+        'GPU: ' + gpu,
+        'núcleos: ' + (nav.hardwareConcurrency || '-') + ' · memória: ' + (nav.deviceMemory ? '≥' + nav.deviceMemory + ' GB' : '-') + (mem ? ' · heap ' + Math.round(mem.usedJSHeapSize / 1048576) + ' MB' : ''),
+        'toque: ' + (MOBILE ? 'sim' : 'não') + ' · ' + ua,
+      ].join('\n');
+    },
+  };
+})() : null;
+
 function frame(t) {
+  const p0 = performance.now();
   const dt = Math.min(0.05, clock.getDelta());
   if (fly) { const k = Math.min(1, (t - fly.t0) / fly.dur), e = ease(k); cam.pos.lerpVectors(fly.fromP, fly.toP, e); cam.look.lerpVectors(fly.fromL, fly.toL, e); if (k >= 1) { const d = fly.done; fly = null; d && d(); } }
   if (orbit && state.mode === 'focus' && !fly) {
@@ -2253,7 +2288,8 @@ function frame(t) {
   cssCamera.position.copy(camera.position).multiplyScalar(K); cssCamera.quaternion.copy(camera.quaternion);
   animate(dt, t); pulseTick(t); freeReadout();
   renderer.render(scene, camera); cssRenderer.render(cssScene, cssCamera);
-  if (first) { first = false; window.__veil.done(); if (/export/.test(location.search)) { exportGLB().catch((e) => { window.__glbInfo = { error: String(e) }; }); return; } }
+  if (perf) perf.tick(t, performance.now() - p0);
+  if (first) { first = false; window.__veil.done(); if (perf) perf.ready(); if (/export/.test(location.search)) { exportGLB().catch((e) => { window.__glbInfo = { error: String(e) }; }); return; } }
   requestAnimationFrame(frame);
 }
 requestAnimationFrame(frame);
