@@ -59,18 +59,8 @@
   #site { display: none; }
   #sitefull { position: fixed; inset: 0; z-index: 50; display: none; background: #141414; }
   #sitefull.show { display: block; }
+  #card .go:focus-visible, #vgo:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
   #sitefull iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #141414; }
-  #sitefull .back { position: absolute; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 1; }
-  /* "oficina": o jeito fixo de voltar para a mesa (engrenagem + nome), igual em todo lugar */
-  .pill { display: inline-flex; align-items: center; gap: 8px; font: inherit; font-size: 15px; font-weight: 500; letter-spacing: -.02em; color: var(--ink); background: rgba(20,20,20,.9); border: 1px solid var(--line); border-radius: 4px; padding: 10px 14px 10px 11px; cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,.35); transition: background .2s, color .2s; }
-  .pill:hover { background: var(--ink); color: var(--dark); }
-  .pill .gear { width: 18px; height: 18px; transition: transform .6s cubic-bezier(.2,.7,.2,1); }
-  .pill:hover .gear { transform: rotate(90deg); }
-  .pill:focus-visible, #card .go:focus-visible, #vgo:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
-  #home { position: fixed; left: 20px; top: 20px; opacity: 0; pointer-events: none; transform: translateY(-8px); transition: opacity .35s, transform .5s cubic-bezier(.2,.7,.2,1), background .2s, color .2s; }
-  body:not(.touch) #home { display: none; }   /* no computador: Esc ou clique fora volta, e o site tem o próprio "oficina" */
-  body.focus #home, body.zoomed #home { opacity: 1; pointer-events: auto; transform: none; }
-  body.zoomed #home { top: auto; bottom: 16px; }
   /* câmera livre (só para modelar): aparece com F no localhost ou com ?livre */
   #free { position: fixed; left: 20px; bottom: 16px; font-size: 13px; line-height: 1.5; color: var(--ink-60); pointer-events: none; display: none; }
   body.free #free { display: block; }
@@ -85,7 +75,6 @@
   <p class="desc"></p>
   <div class="row"><button type="button" class="go">ver projeto</button><span class="drag"></span></div>
 </div>
-<button id="home" type="button" class="pill" aria-label="voltar para a oficina"><svg class="gear" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="3.73 3.73"/><circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="4"/></svg>oficina</button>
 <div id="site" aria-hidden="true"></div>
 <div id="free"><b>câmera livre</b> · botão do meio move · Shift + botão do meio gira · rodinha aproxima · H volta ao início · F ou Esc sai<br><code class="xyz"></code></div>
 <div id="veil"><div class="vbox">
@@ -1918,7 +1907,7 @@ document.addEventListener('visibilitychange', () => { gyro.g0 = null; });
 if (/debug/.test(location.search)) window.__tilt = onTilt;
 addEventListener('pointermove', (e) => { if (!(gyro.on && isNarrow())) mouseN.set((e.clientX / W) * 2 - 1, (e.clientY / H) * 2 - 1); if (e.pointerType === 'mouse' && state.mode === 'desk' && !fly) setHover(pick(e)); });   // o dedo move a vista como o mouse; o brilho de "passar o mouse" é só do mouse
 
-const tag = document.getElementById('card'), homeBtn = document.getElementById('home'), site = document.getElementById('site');
+const tag = document.getElementById('card'), site = document.getElementById('site');
 // câmera de cada projeto: o objeto no terço esquerdo e a direita livre para a etiqueta; os da mesa são vistos mais de cima
 // drag: 'spin' gira o objeto, 'orbit' gira a câmera em volta dele (objeto fixo), 'none' não gira (só a animação)
 const FOCUS = { drone: { up: 0.25, dist: 1.5, drag: 'spin' }, bike: { up: 0.2, dist: 1.25, drag: 'none' }, robo: { up: 0.55, dist: 1.6, drag: 'orbit' }, toddy: { up: 0.7, dist: 1.7, drag: 'spin' } };
@@ -1970,12 +1959,11 @@ function closeScreen() {
 }
 // celular: o site de verdade abre em tela cheia, por cima da cena (sem 3D, então aparece certo no iPhone e no tamanho de celular), com um botão para voltar à mesa
 const full = document.createElement('div'); full.id = 'sitefull'; full.setAttribute('aria-hidden', 'true');
-full.innerHTML = '<iframe title="Portfólio de Felipe Collucci" allow="fullscreen; autoplay"></iframe><button type="button" class="back pill" aria-label="voltar para a oficina"><svg class="gear" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="3.73 3.73"/><circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="4"/></svg>oficina</button>';
+full.innerHTML = '<iframe title="Portfólio de Felipe Collucci" allow="fullscreen; autoplay"></iframe>';
 document.body.appendChild(full);
 const fullFrame = full.querySelector('iframe');
 function openFull() { if (state.mode === 'focus') closeFocus(); hideTag(); setHover(null); if (!fullFrame.src) fullFrame.src = SITE_URL; full.classList.add('show'); full.setAttribute('aria-hidden', 'false'); }
 function closeFull() { full.classList.remove('show'); full.setAttribute('aria-hidden', 'true'); }
-full.querySelector('.back').addEventListener('click', closeFull);
 addEventListener('message', (e) => { if (full.classList.contains('show') && e.origin === new URL(SITE_URL).origin && e.data && (e.data.type === 'oficina' || e.data.type === 'escape')) closeFull(); });   // "Oficina" no cabeçalho do site também volta para a mesa
 // o site dentro do monitor avisa por postMessage quando o visitante clica em "Oficina" no cabeçalho: sai do zoom e volta à vista da mesa
 addEventListener('message', (e) => { if (e.origin === new URL(SITE_URL).origin && e.data && (e.data.type === 'oficina' || e.data.type === 'escape') && state.mode === 'screen' && site.classList.contains('show')) closeScreen(); });
@@ -2013,7 +2001,6 @@ canvas.addEventListener('click', (e) => {
   if (g.userData.id === 'monitor') openScreen(); else openFocus(g);
 });
 tag.querySelector('.go').addEventListener('click', () => { if (state.focus) openScreen(state.focus.userData.id); });
-homeBtn.addEventListener('click', (e) => { if (state.mode === 'focus' && !fly) { e.stopPropagation(); closeFocus(); } });   // no site ampliado, o clique fora do site (listener do document) já volta
 addEventListener('keydown', (e) => { if (e.key !== 'Escape') return; if (state.mode === 'focus') closeFocus(); else if (state.mode === 'screen' && site.classList.contains('show')) closeScreen(); });
 
 // ---------- câmera livre, com os controles do Fusion 360 (ferramenta de modelagem, não aparece para visitantes) ----------
