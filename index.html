@@ -2009,13 +2009,16 @@ const overScreen = (e) => {
   return ray.intersectObjects(solid, false)[0]?.object === screen;
 };
 const NEAR = 20;   // celular: folga em volta de cada objeto, em pixels (o dedo é mais largo que o mouse)
-const hbCorners = [0, 1, 2, 3, 4, 5, 6, 7].map(() => new THREE.Vector3());
+const MINHIT = 64;   // celular: tamanho mínimo, em pixels, do retângulo de toque de cada objeto
+const hbCorners =[0, 1, 2, 3, 4, 5, 6, 7].map(() => new THREE.Vector3());
 const nearTouch = (e) => {   // acha o objeto cujo retângulo na tela (com folga) contém o toque; entre vários, o menor (o monitor grande perde para o objeto pequeno na frente dele)
   let best = null, area = Infinity;
   for (const g of clickables) {
     const hb = g.children.find((o) => o.userData.hitbox) || g, bb = new THREE.Box3().setFromObject(hb);
     let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
     hbCorners.forEach((c, i) => { c.set(i & 1 ? bb.max.x : bb.min.x, i & 2 ? bb.max.y : bb.min.y, i & 4 ? bb.max.z : bb.min.z).project(camera); const px = (c.x + 1) / 2 * W, py = (1 - c.y) / 2 * H; x0 = Math.min(x0, px); x1 = Math.max(x1, px); y0 = Math.min(y0, py); y1 = Math.max(y1, py); });
+    if (x1 - x0 < MINHIT) { const cx = (x0 + x1) / 2; x0 = cx - MINHIT / 2; x1 = cx + MINHIT / 2; }   // objeto pequeno na tela (o Toddy): o alvo nunca fica menor que um dedo
+    if (y1 - y0 < MINHIT) { const cy = (y0 + y1) / 2; y0 = cy - MINHIT / 2; y1 = cy + MINHIT / 2; }
     if (e.clientX < x0 - NEAR || e.clientX > x1 + NEAR || e.clientY < y0 - NEAR || e.clientY > y1 + NEAR) continue;
     const a = (x1 - x0 + 2 * NEAR) * (y1 - y0 + 2 * NEAR); if (a < area) { area = a; best = g; }
   }
