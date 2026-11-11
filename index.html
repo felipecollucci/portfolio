@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Felipe Collucci · escritório</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Funnel+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Funnel+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}</script>
 <style>
-  :root { --ink: #ece8e1; --ink-60: rgba(236,232,225,.6); --dark: #141414; --blue: #1f3f9e; --paper: #f6f1e4; --rule: #a9c1e3; --margin: #e08a8a; }
+  :root { --ink: #ece8df; --ink-60: rgba(236,232,223,.6); --line: rgba(236,232,223,.16); --dark: #141414; --blue: #1f3f9e; }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: #141416; font-family: "Funnel Sans", system-ui, sans-serif; }
   canvas#gl { position: fixed; left: 0; top: 0; display: block; width: 100vw; height: 100vh; }
@@ -16,84 +16,102 @@
   #css3d .screen-frame { background: #141414; border: 0; }
   #css3d iframe { display: block; width: 100%; height: 100%; border: 0; background: #141414; }
   body.hover canvas#gl { cursor: pointer; }
-  #veil { position: fixed; inset: 0; display: grid; place-items: center; background: #141416; color: var(--ink-60); font-size: 14px; letter-spacing: .02em; transition: opacity .9s ease; }
+  /* tela de entrada: engrenagem girando enquanto a cena carrega, as três instruções e, no fim, o botão de começar */
+  #veil { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: var(--dark); color: var(--ink); transition: opacity .9s ease; }
   #veil.off { opacity: 0; pointer-events: none; }
-  #veil .vbox { display: grid; gap: 18px; justify-items: center; text-align: center; padding: 0 24px; }
-  #vgo { font: inherit; font-size: 15px; letter-spacing: .01em; color: #141416; background: #ece8e1; border: 0; border-radius: 999px; padding: 13px 24px; cursor: pointer; }
+  #veil .vbox { width: min(460px, 100% - 48px); }
+  .vstatus { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 500; color: var(--ink-60); }
+  .vstatus .gear { width: 20px; height: 20px; color: var(--ink); animation: turn 2.4s linear infinite; }
+  #veil.ready .vstatus .gear { animation: none; }
+  @keyframes turn { to { transform: rotate(360deg); } }
+  .vsteps { list-style: none; margin: 28px 0 0; padding: 0; }
+  .vsteps li { display: flex; align-items: baseline; gap: 14px; padding: 14px 0; border-top: 1px solid var(--line); opacity: 0; transform: translateY(12px); animation: rise .7s cubic-bezier(.2,.7,.2,1) forwards; }
+  .vsteps li:nth-child(2) { animation-delay: .12s; } .vsteps li:nth-child(3) { animation-delay: .24s; border-bottom: 1px solid var(--line); }
+  .vsteps span { font-size: 13px; font-weight: 500; color: var(--ink-60); font-variant-numeric: tabular-nums; }
+  .vsteps b { font-size: 22px; line-height: 1.15; font-weight: 500; letter-spacing: -.03em; }
+  .vfoot { height: 48px; margin-top: 28px; display: flex; align-items: center; }
+  .vbar { position: relative; width: 100%; height: 1px; background: var(--line); overflow: hidden; }
+  .vbar::after { content: ""; position: absolute; inset: 0; width: 30%; background: var(--ink); animation: slide 1.6s cubic-bezier(.5,0,.5,1) infinite; }
+  @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(334%); } }
+  #veil.ready .vbar { display: none; }
+  #veil #vgo { padding: 14px 22px; animation: rise .6s cubic-bezier(.2,.7,.2,1) backwards; }
   #vgo[hidden] { display: none; }
-  #hint { position: fixed; left: 20px; bottom: 16px; font-size: 13px; color: var(--ink-60); pointer-events: none; transition: opacity .3s; }
-  body.away #hint { opacity: 0; }
-  #hint2 { position: fixed; left: 20px; bottom: 16px; font-size: 13px; color: var(--ink-60); pointer-events: none; opacity: 0; transition: opacity .3s; }
-  body.focus #hint2 { opacity: 1; }
   body.focus canvas#gl { cursor: grab; } body.focus.nodrag canvas#gl { cursor: default; } body.dragging canvas#gl { cursor: grabbing; }
 
-  /* etiqueta: ficha pautada presa por barbante, vira no segundo clique */
-  #string { position: fixed; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-  #tag { position: fixed; left: 0; top: 0; width: 280px; height: 182px; perspective: 900px; opacity: 0; pointer-events: none; transition: opacity .3s; }
-  #tag.show { opacity: 1; pointer-events: auto; }
-  #tag .swing { width: 100%; height: 100%; transform-origin: 20px 20px; }
-  #tag .flip { position: relative; width: 100%; height: 100%; transform-style: preserve-3d; transition: transform .6s cubic-bezier(.3,.7,.2,1); cursor: pointer; }
-  #tag.back .flip { transform: rotateY(180deg); }
-  #tag .face { position: absolute; inset: 0; backface-visibility: hidden; border-radius: 3px; padding: 14px 18px 12px 44px;
-    background: var(--paper) repeating-linear-gradient(to bottom, transparent 0 25px, var(--rule) 25px 26px) 0 38px / 100% calc(100% - 38px) no-repeat;
-    box-shadow: 0 14px 30px rgba(0,0,0,.5); font-family: "Caveat", cursive; color: #1d1b18; }
-  #tag .face::before { content: ""; position: absolute; top: 0; bottom: 0; left: 34px; width: 1.5px; background: var(--margin); }
-  #tag .face::after { content: ""; position: absolute; left: 13px; top: 13px; width: 13px; height: 13px; border-radius: 50%; background: #141416; box-shadow: 0 0 0 4px #e3d3a8; }
-  #tag .back-face { transform: rotateY(180deg); padding: 14px 44px 12px 18px; }
-  #tag .back-face::after { left: auto; right: 13px; }
-  #tag .back-face::before { left: auto; right: 34px; }
-  #tag h3 { margin: 0 0 4px; font-size: 32px; line-height: 1; font-weight: 700; }
-  #tag .meta { font-size: 22px; line-height: 26px; }
-  #tag .desc { font-size: 20px; line-height: 26px; margin: 10px 0 0; }
-  #tag .go { display: inline-block; margin-top: 2px; font-size: 22px; font-weight: 700; color: var(--blue); cursor: pointer; }
-  #tag .go:hover { text-decoration: underline; }
-  #tag .turn { position: absolute; right: 12px; bottom: 6px; font-size: 17px; color: #8a8478; }
+  /* caixa de texto do projeto: escura, letras creme, na linguagem do site; os elementos sobem um depois do outro */
+  #card { position: fixed; right: max(32px, 7vw); top: 50%; width: 360px; transform: translateY(-50%); padding: 28px 28px 24px; color: var(--ink); background: rgba(20,20,20,.92); border: 1px solid var(--line); border-radius: 4px; box-shadow: 0 24px 60px rgba(0,0,0,.45); opacity: 0; pointer-events: none; transition: opacity .3s; }
+  #card.show { opacity: 1; pointer-events: auto; }
+  #card > * { opacity: 0; transform: translateY(16px); }
+  #card.show > * { animation: rise .7s cubic-bezier(.2,.7,.2,1) forwards; }
+  #card.show > :nth-child(2) { animation-delay: .07s; } #card.show > :nth-child(3) { animation-delay: .14s; } #card.show > :nth-child(4) { animation-delay: .21s; }
+  @keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
+  #card .meta { font-size: 13px; font-weight: 500; color: var(--ink-60); }
+  #card h3 { margin: 10px 0 0; font-size: 34px; line-height: 1.02; font-weight: 700; letter-spacing: -.04em; }
+  #card .desc { margin: 14px 0 0; font-size: 16px; line-height: 1.45; letter-spacing: -.01em; color: rgba(236,232,223,.82); }
+  #card .row { display: flex; align-items: center; gap: 16px; margin-top: 22px; }
+  #card .go, #vgo { font: inherit; font-size: 16px; font-weight: 500; letter-spacing: -.02em; color: var(--dark); background: var(--ink); border: 0; border-radius: 4px; padding: 12px 18px; cursor: pointer; transition: opacity .2s; }
+  #card .go:hover, #vgo:hover { opacity: .85; }
+  #card .drag { font-size: 13px; color: var(--ink-60); }
+  body.narrow #card { left: 16px; right: 16px; top: auto; bottom: calc(16px + env(safe-area-inset-bottom)); width: auto; transform: none; padding: 22px 22px 20px; }
+  body.narrow #card h3 { font-size: 30px; }
 
   /* monitor: o site fica dentro da tela 3D; #site só marca que o zoom terminou */
   #site { display: none; }
   #sitefull { position: fixed; inset: 0; z-index: 50; display: none; background: #141414; }
   #sitefull.show { display: block; }
   #sitefull iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #141414; }
-  #sitefull .back { position: absolute; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 1; font: inherit; font-size: 14px; color: #141416; background: #ece8e1; border: 0; border-radius: 999px; padding: 11px 20px; box-shadow: 0 6px 20px rgba(0,0,0,.4); cursor: pointer; }
-  #hint3 { position: fixed; left: 20px; bottom: 16px; font-size: 13px; color: var(--ink-60); pointer-events: none; opacity: 0; transition: opacity .3s; }
-  body.zoomed #hint3 { opacity: 1; }
+  #sitefull .back { position: absolute; left: 16px; bottom: calc(16px + env(safe-area-inset-bottom)); z-index: 1; }
+  /* "oficina": o jeito fixo de voltar para a mesa (engrenagem + nome), igual em todo lugar */
+  .pill { display: inline-flex; align-items: center; gap: 8px; font: inherit; font-size: 15px; font-weight: 500; letter-spacing: -.02em; color: var(--ink); background: rgba(20,20,20,.9); border: 1px solid var(--line); border-radius: 4px; padding: 10px 14px 10px 11px; cursor: pointer; box-shadow: 0 8px 24px rgba(0,0,0,.35); transition: background .2s, color .2s; }
+  .pill:hover { background: var(--ink); color: var(--dark); }
+  .pill .gear { width: 18px; height: 18px; transition: transform .6s cubic-bezier(.2,.7,.2,1); }
+  .pill:hover .gear { transform: rotate(90deg); }
+  .pill:focus-visible, #card .go:focus-visible, #vgo:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+  #home { position: fixed; left: 20px; top: 20px; opacity: 0; pointer-events: none; transform: translateY(-8px); transition: opacity .35s, transform .5s cubic-bezier(.2,.7,.2,1), background .2s, color .2s; }
+  body:not(.touch) #home { display: none; }   /* no computador: Esc ou clique fora volta, e o site tem o próprio "oficina" */
+  body.focus #home, body.zoomed #home { opacity: 1; pointer-events: auto; transform: none; }
+  body.zoomed #home { top: auto; bottom: 16px; }
   /* câmera livre (só para modelar): aparece com F no localhost ou com ?livre */
   #free { position: fixed; left: 20px; bottom: 16px; font-size: 13px; line-height: 1.5; color: var(--ink-60); pointer-events: none; display: none; }
-  body.free #free { display: block; } body.free #hint { opacity: 0; }
+  body.free #free { display: block; }
   #free b { color: var(--ink); font-weight: 600; } #free code { font: 12px ui-monospace, Consolas, monospace; color: var(--ink); }
 </style>
 </head>
 <body>
 <canvas id="gl"></canvas>
-<svg id="string"><path id="stringPath" fill="none" stroke="#e3d3a8" stroke-width="1.6" stroke-linecap="round" /></svg>
-<div id="tag" aria-live="polite">
-  <div class="swing"><div class="flip">
-    <div class="face front"><h3 class="t"></h3><div class="meta"></div><span class="turn">vire ↻</span></div>
-    <div class="face back-face"><p class="desc"></p><span class="go" role="link" tabindex="0">ver projeto completo →</span></div>
-  </div></div>
+<div id="card" aria-live="polite">
+  <div class="meta"></div>
+  <h3 class="t"></h3>
+  <p class="desc"></p>
+  <div class="row"><button type="button" class="go">ver projeto</button><span class="drag"></span></div>
 </div>
+<button id="home" type="button" class="pill" aria-label="voltar para a oficina"><svg class="gear" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="3.73 3.73"/><circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="4"/></svg>oficina</button>
 <div id="site" aria-hidden="true"></div>
-<div id="hint">passe o mouse sobre os projetos · clique no monitor para ampliar o site</div>
-<div id="hint3">clique fora do site, ou aperte Esc, para voltar para a mesa</div>
-<div id="hint2">arraste para girar o projeto · clique fora ou Esc para voltar</div>
 <div id="free"><b>câmera livre</b> · botão do meio move · Shift + botão do meio gira · rodinha aproxima · H volta ao início · F ou Esc sai<br><code class="xyz"></code></div>
-<div id="veil"><div class="vbox"><div id="vmsg">carregando o escritório…</div><button id="vgo" type="button" hidden>toque para ativar o movimento</button></div></div>
+<div id="veil"><div class="vbox">
+  <div class="vstatus"><svg class="gear" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="3.73 3.73"/><circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="4"/></svg><span id="vmsg">montando a oficina…</span></div>
+  <ol class="vsteps">
+    <li><span>01</span><b data-touch="incline o celular para olhar em volta">mova o mouse para olhar em volta</b></li>
+    <li><span>02</span><b data-touch="toque nos objetos para ver os projetos">clique nos objetos para ver os projetos</b></li>
+    <li><span>03</span><b data-touch="toque no monitor para abrir o portfólio">clique no monitor para abrir o portfólio</b></li>
+  </ol>
+  <div class="vfoot"><div class="vbar"></div><button id="vgo" type="button" hidden data-touch="toque para começar">clique para começar</button></div>
+</div></div>
 <script>
-// Tela de carregamento. O escritório começa a carregar na hora, por trás desta tela.
-// Celular: a página tenta liberar o sensor de movimento sozinha, já durante o carregamento. Onde o sistema exige um toque antes (iPhone, regra da Apple), aparece o botão: o toque faz o pedido enquanto a cena termina de carregar.
-// Se a cena terminar antes do toque, a tela espera o toque para entrar (assim o pedido nunca fica para depois). Computador, e celular que libera sozinho: a tela some quando a cena fica pronta.
+// Tela de entrada. O escritório começa a carregar na hora, por trás dela. Quando a cena fica pronta, aparece o botão de começar.
+// Celular: o sensor de movimento é pedido sozinho já no carregamento; onde o sistema exige um toque antes (iPhone, regra da Apple), o toque em "começar" faz o pedido.
 (() => {
   const D = window.DeviceOrientationEvent, veil = document.getElementById('veil'), msg = document.getElementById('vmsg'), btn = document.getElementById('vgo');
-  const ask = !!(D && typeof D.requestPermission === 'function') && matchMedia('(pointer: coarse)').matches;
-  const v = window.__veil = { needTap: ask, tapped: false, loaded: false, tilt: null, onTilt: null };
-  const hide = () => { if (v.loaded && (!v.needTap || v.tapped)) veil.classList.add('off'); };
-  const label = () => { btn.textContent = v.loaded ? 'toque para entrar' : 'toque para ativar o movimento'; if (v.loaded) msg.textContent = 'pronto'; };
-  const got = (s) => { v.tilt = s; if (s === 'granted' && v.onTilt) v.onTilt(); };
-  v.done = () => { v.loaded = true; if (v.needTap && !v.tapped && !btn.hidden) label(); hide(); };
-  if (!ask) return;
-  btn.addEventListener('click', () => { v.tapped = true; btn.hidden = true; hide(); D.requestPermission().then(got).catch(() => got('denied')); });
-  // primeira tentativa sem toque: se o sistema liberar, não precisa de botão; se recusar por falta de toque, mostra o botão
-  D.requestPermission().then((s) => { if (s === 'granted') { got(s); v.needTap = false; hide(); } else { label(); btn.hidden = false; } }).catch(() => { label(); btn.hidden = false; });
+  const coarse = matchMedia('(pointer: coarse)').matches, ask = !!(D && typeof D.requestPermission === 'function') && coarse;
+  if (coarse) veil.querySelectorAll('[data-touch]').forEach((el) => { el.textContent = el.dataset.touch; });
+  const v = window.__veil = { loaded: false, started: false, tilt: null, onStart: null };
+  const got = (s) => { v.tilt = s; };
+  v.done = () => { v.loaded = true; veil.classList.add('ready'); msg.textContent = 'oficina pronta'; btn.hidden = false; };
+  btn.addEventListener('click', () => {
+    if (ask && v.tilt !== 'granted') D.requestPermission().then(got).catch(() => got('denied'));
+    v.started = true; veil.classList.add('off'); if (v.onStart) v.onStart();
+  });
+  if (ask) D.requestPermission().then(got).catch(() => {});
 })();
 </script>
 
@@ -562,11 +580,13 @@ return {
     const UP = 9, HOLD = 2;                                                      // seconds to go up, seconds waiting at each end
     let play = true, clock = 0;
     const ease = t => t*t*(3 - 2*t);
+    const START_PUSH = 1.7;                                                      // >1: each leg (up and down) starts faster and eases only on arrival; 1 = old smooth start
+    const quick = t => 1 - (1 - t)**START_PUSH;
     const controls = [{ label:'Animar: on', onClick(b){ play = !play; b.textContent = 'Animar: ' + (play?'on':'off'); } }];
     const update = dt => {                                                       // runs after the viewer applied the explode offsets
       if(play) clock = (clock + dt) % (2*(UP + HOLD));
       const u = clock < HOLD ? 0 : clock < HOLD + UP ? (clock - HOLD)/UP : clock < 2*HOLD + UP ? 1 : 1 - (clock - 2*HOLD - UP)/UP;   // 0 outside .. 1 hung
-      const d = TOTAL*ease(u), [fx, fz] = front(d);
+      const down = clock >= 2*HOLD + UP, d = TOTAL*(down ? 1 - quick(1 - u) : quick(u)), [fx, fz] = front(d);   // u counts the leg's progress, so the quick start applies to the descent too
       const dz = fz - GROUND, rx = fx - Math.sqrt(L*L - dz*dz);                  // rear hub on the ground, one wheelbase behind
       const phi = Math.atan2(dz, fx - rx) - (Math.atan2(end[1] - GROUND, end[0] - endRear));   // how far the bicycle is turned from its hung pose
       const hr0 = [mm(HUB_R[0]), mm(HUB_R[1])], hr = [mm(rx - endRear + HUB_R[0]), mm(GROUND)], hf0 = [mm(HUB_F[0]), mm(HUB_F[1])], hf = [mm(fx - end[0] + HUB_F[0]), mm(fz - end[1] + HUB_F[1])];   // measured from the hung pose
@@ -682,12 +702,12 @@ return {
 
 import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
 
-// ===================== CONTEÚDO (provisório) =====================
+// ===================== CONTEÚDO (vem de Profissional/perfil.md) =====================
 const PROJECTS = {
-  drone: { title: 'Autonomous Drone', meta: ['Design Engineering', '2025', 'Design e engenharia'], desc: 'Resumo do projeto. Troque este texto pelo resumo real do drone autônomo.' },
-  bike:  { title: 'Modular Bike Ramp', meta: ['Urban furniture', '2025', 'Design de produto'], desc: 'Resumo do projeto. Troque este texto pelo resumo real do bicicletário.' },
-  robo:  { title: 'Combat Robots', meta: ['Design Engineering', '2025', 'Design e engenharia'], desc: 'Resumo do projeto. Troque este texto pelo resumo real dos robôs de combate.' },
-  toddy: { title: 'Rebrand Toddy', meta: ['Brand Design', '2025', 'Design de embalagem'], desc: 'Resumo do projeto. Troque este texto pelo resumo real do rebrand do Toddy.' },
+  drone: { title: 'Drone autônomo', meta: ['Sapienza Flight Team', 'C-UASC 2026'], desc: 'Drone para missões totalmente autônomas na competição C-UASC 2026, na Califórnia. Fiz a modelagem estrutural: fuselagem, trens de pouso e sistemas de carga. 1º lugar na Aircraft Design Competition.' },
+  bike:  { title: 'Bicicletário Arcus', meta: ['Design de produto', 'Sapienza, Roma'], desc: 'Bicicletário modular semi-vertical para espaços urbanos compactos. Uma calha curva apoia as rodas, e a bicicleta sobe com pouco esforço até travar. Estrutura em chapas de aço cortadas e soldadas.' },
+  robo:  { title: 'Robôs de combate', meta: ['UERJBotz', 'desde 2024'], desc: 'Lidero os robôs de combate da UERJBotz, da ideia à modelagem e à manufatura. Em 2024 a equipe ficou com 1º, 2º e 3º lugar na categoria de 150 g do CCBB Robotics Challenge.' },
+  toddy: { title: 'Toddy', meta: ['Design gráfico', 'ESDI / UERJ'], desc: 'Proposta de redesign da embalagem e da comunicação visual do achocolatado Toddy. O desafio foi trazer um ar minimalista sem destoar de um produto já consolidado no Brasil.' },
 };
 // os modelos dos projetos são os do visualizador (projects/*.js), sem alteração
 const MODEL_URLS = { drone: './models/drone.js', robo: './models/equipe.js', bike: './models/bike.js', toddy: './models/toddy.js' };
@@ -888,7 +908,7 @@ const SITE_URL = 'https://resilient-clarity-459683.framer.app', SITE_FILL = 0.95
 const K = 1000, cssScene = new THREE.Scene(), cssRenderer = new CSS3DRenderer(), cssCamera = new THREE.PerspectiveCamera(40, 1, 0.02 * K, 50 * K);
 cssRenderer.domElement.id = 'css3d'; document.body.insertBefore(cssRenderer.domElement, canvas);
 const siteFrame = document.createElement('div'); siteFrame.className = 'screen-frame'; siteFrame.style.cssText = 'width:1600px;height:1000px';
-const MOBILE = matchMedia('(pointer: coarse)').matches;   // celular ou tablet (tela de toque)
+const MOBILE = matchMedia('(pointer: coarse)').matches; if (MOBILE) document.body.classList.add('touch');   // celular ou tablet (tela de toque)
 const siteIframe = document.createElement('iframe'); if (!MOBILE) siteIframe.src = SITE_URL; siteIframe.title = 'Portfólio de Felipe Collucci'; siteIframe.allow = 'fullscreen; autoplay'; siteFrame.appendChild(siteIframe);
 const siteObj = new CSS3DObject(siteFrame); siteObj.position.set(0, SCREEN.y * K, (SCREEN.z + 0.0004) * K); siteObj.scale.setScalar((SCREEN.w * K) / 1600); if (!MOBILE) cssScene.add(siteObj);
 // celular: o site em 3D falha no Safari do iPhone (corta o topo e some o menu) e fica com letras minúsculas. Por isso a tela do monitor mostra uma imagem do site (quadrossite-monitor.jpg; tire outra quando o site mudar), e tocar nele abre o site de verdade em tela cheia (openFull)
@@ -1857,7 +1877,7 @@ const resize = () => { W = innerWidth; H = innerHeight; renderer.setSize(W, H, f
     camera.fov = W / H < 1.6 ? 40 * Math.min(1.45, 1.6 / (W / H)) : 40;
     HOME.pos.copy(HOME_WIDE.pos); HOME.look.copy(HOME_WIDE.look); panMax = 0;
   }
-  homeDirty = true; camera.updateProjectionMatrix(); };
+  homeDirty = true; document.body.classList.toggle('narrow', isNarrow()); camera.updateProjectionMatrix(); };
 addEventListener('resize', resize); resize();
 const mouseN = new THREE.Vector2(), mouseS = new THREE.Vector2();
 const cam = { pos: HOME.pos.clone(), look: HOME.look.clone() };
@@ -1878,8 +1898,7 @@ const pick = (e) => {
   const hits = ray.intersectObjects(clickables, true); if (!hits.length) return null;
   let o = hits[0].object; while (o && !o.userData.id) o = o.parent; return o;
 };
-const glowOn = (g, on) => g && g.traverse((o) => { if (o.material && o.material.emissive && o !== screen) o.material.emissive.setHex(on ? 0x14286e : 0x000000); });
-const setHover = (g) => { if (g === state.hover) return; glowOn(state.hover, false); state.hover = g; glowOn(g, true); document.body.classList.toggle('hover', !!g); };
+const setHover = (g) => { if (g === state.hover) return; state.hover = g; document.body.classList.toggle('hover', !!g); };
 // celular em pé: a vista acompanha a INCLINAÇÃO do aparelho (giroscópio) em vez do dedo. A posição em que o celular estava ao começar vira o centro; o limite é GYRO_RANGE graus para cada lado (depois disso a vista para na borda da mesa). O toque continua só para clicar nos objetos.
 const GYRO_RANGE = 20;   // graus de inclinação que levam a vista do centro até a borda
 const gyro = { on: false, g0: null, b0: null };
@@ -1893,21 +1912,20 @@ const onTilt = (e) => {
 const startTilt = () => {   // o sensor fica sempre escutando: onde o sistema exige licença (iPhone), o pedido é feito na tela de carregamento (script do #veil) e os movimentos só chegam depois que a pessoa aceita
   if (window.DeviceOrientationEvent) addEventListener('deviceorientation', onTilt);
 };
-if (matchMedia('(pointer: coarse)').matches) { startTilt(); document.getElementById('hint').textContent = 'incline o celular para olhar em volta · toque nos projetos e no monitor'; }
+if (matchMedia('(pointer: coarse)').matches) startTilt();
 addEventListener('resize', () => { gyro.g0 = null; });   // girou o celular ou mudou a tela: recalibra o centro
 document.addEventListener('visibilitychange', () => { gyro.g0 = null; });
 if (/debug/.test(location.search)) window.__tilt = onTilt;
 addEventListener('pointermove', (e) => { if (!(gyro.on && isNarrow())) mouseN.set((e.clientX / W) * 2 - 1, (e.clientY / H) * 2 - 1); if (e.pointerType === 'mouse' && state.mode === 'desk' && !fly) setHover(pick(e)); });   // o dedo move a vista como o mouse; o brilho de "passar o mouse" é só do mouse
 
-const hint2 = document.getElementById('hint2'), tag = document.getElementById('tag'), stringPath = document.getElementById('stringPath'), site = document.getElementById('site');
+const tag = document.getElementById('card'), homeBtn = document.getElementById('home'), site = document.getElementById('site');
 // câmera de cada projeto: o objeto no terço esquerdo e a direita livre para a etiqueta; os da mesa são vistos mais de cima
 // drag: 'spin' gira o objeto, 'orbit' gira a câmera em volta dele (objeto fixo), 'none' não gira (só a animação)
 const FOCUS = { drone: { up: 0.25, dist: 1.5, drag: 'spin' }, bike: { up: 0.2, dist: 1.25, drag: 'none' }, robo: { up: 0.55, dist: 1.6, drag: 'orbit' }, toddy: { up: 0.7, dist: 1.7, drag: 'spin' } };
-const HINT2 = { spin: 'arraste para girar o projeto · clique fora ou Esc para voltar', orbit: 'arraste para girar a câmera em volta · clique fora ou Esc para voltar', none: 'clique fora ou Esc para voltar' };
 let orbit = null;   // câmera em órbita no destaque: { c, R, el0, az, el, azT, elT }
 function openFocus(g) {
   const id = g.userData.id, m = P[id], F = FOCUS[id];
-  state.mode = 'focus'; state.focus = g; setHover(null); document.body.classList.add('away', 'focus'); document.body.classList.toggle('nodrag', F.drag === 'none'); hint2.textContent = HINT2[F.drag]; orbit = null;
+  state.mode = 'focus'; state.focus = g; setHover(null); document.body.classList.add('away', 'focus'); document.body.classList.toggle('nodrag', F.drag === 'none'); noteOpened(); orbit = null;
   // celular em pé: o objeto fica centralizado e no alto da tela (ocupando ~80% da largura) e a etiqueta vai embaixo; "lift" sobe o objeto no quadro sem mudar o ângulo da câmera
   const narrow = isNarrow(), tf = Math.tan((camera.fov * Math.PI) / 360);
   const c = new THREE.Box3().setFromObject(g).getCenter(V()), r = Math.max(m.size.x, m.size.y, m.size.z);
@@ -1924,22 +1942,24 @@ function openFocus(g) {
   flyTo(from, c.clone().add(V(narrow ? 0 : r * 0.42, -lift, 0)), 950, () => { showTag(g); if (F.drag === 'orbit') { const o = from0.clone().sub(c); orbit = { c, side: narrow ? 0 : r * 0.42, lift, R: o.length(), el0: Math.asin(o.y / o.length()), az: 0, el: 0, azT: 0, elT: 0 }; } });
   focusLight.position.copy(c).add(V(0.05, 0.2, 0.3)); focusLight.userData.target = 1.3;
 }
+const DRAG_TIP = { spin: 'arraste para girar', orbit: 'arraste para girar em volta', none: '' };
 function showTag(g) {
   const p = PROJECTS[g.userData.id];
+  tag.querySelector('.meta').textContent = p.meta.join(' · ');
   tag.querySelector('.t').textContent = p.title;
-  tag.querySelector('.meta').replaceChildren(...p.meta.map((m) => { const d = document.createElement('div'); d.textContent = m; return d; }));
   tag.querySelector('.desc').textContent = p.desc;
-  tag.classList.remove('back'); tag.classList.add('show'); swingT0 = performance.now();
+  tag.querySelector('.drag').textContent = DRAG_TIP[FOCUS[g.userData.id].drag];
+  tag.classList.add('show');
 }
-function hideTag() { tag.classList.remove('show', 'back'); stringPath.setAttribute('d', ''); }
+function hideTag() { tag.classList.remove('show'); }
 function closeFocus() {
   if (state.mode !== 'focus') return;
   hideTag(); focusLight.userData.target = 0; state.mode = 'desk'; state.focus = null; orbit = null; drag = null; document.body.classList.remove('dragging'); document.body.classList.remove('focus', 'nodrag');
   flyTo(HOME.pos.clone(), HOME.look.clone(), 850, () => document.body.classList.remove('away'));
 }
 function openScreen(projectId) {
-  if (MOBILE) { openFull(); return; }
-  hideTag(); focusLight.userData.target = 0; setHover(null); document.body.classList.add('away');
+  if (MOBILE) { noteOpened(); openFull(); return; }
+  hideTag(); focusLight.userData.target = 0; setHover(null); document.body.classList.add('away'); document.body.classList.remove('focus', 'nodrag'); noteOpened();
   state.mode = 'screen'; state.focus = null;
   const t = Math.tan((camera.fov * Math.PI) / 360), d = Math.max(SCREEN.h / 2 / t, SCREEN.w / 2 / t / camera.aspect) / SITE_FILL;   // a tela inteira cabe, com 5% de folga
   flyTo(V(0, SCREEN.y, SCREEN.z + d), V(0, SCREEN.y, SCREEN.z), 1200, () => { site.classList.add('show'); site.setAttribute('aria-hidden', 'false'); document.body.classList.add('zoomed'); canvas.style.pointerEvents = 'none'; });
@@ -1950,7 +1970,7 @@ function closeScreen() {
 }
 // celular: o site de verdade abre em tela cheia, por cima da cena (sem 3D, então aparece certo no iPhone e no tamanho de celular), com um botão para voltar à mesa
 const full = document.createElement('div'); full.id = 'sitefull'; full.setAttribute('aria-hidden', 'true');
-full.innerHTML = '<iframe title="Portfólio de Felipe Collucci" allow="fullscreen; autoplay"></iframe><button type="button" class="back">voltar para a mesa</button>';
+full.innerHTML = '<iframe title="Portfólio de Felipe Collucci" allow="fullscreen; autoplay"></iframe><button type="button" class="back pill" aria-label="voltar para a oficina"><svg class="gear" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="3.73 3.73"/><circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="4"/></svg>oficina</button>';
 document.body.appendChild(full);
 const fullFrame = full.querySelector('iframe');
 function openFull() { if (state.mode === 'focus') closeFocus(); hideTag(); setHover(null); if (!fullFrame.src) fullFrame.src = SITE_URL; full.classList.add('show'); full.setAttribute('aria-hidden', 'false'); }
@@ -1992,7 +2012,8 @@ canvas.addEventListener('click', (e) => {
   const g = pick(e); if (!g) return;
   if (g.userData.id === 'monitor') openScreen(); else openFocus(g);
 });
-tag.querySelector('.flip').addEventListener('click', (e) => { if (e.target.classList.contains('go')) { openScreen(state.focus.userData.id); return; } tag.classList.toggle('back'); });
+tag.querySelector('.go').addEventListener('click', () => { if (state.focus) openScreen(state.focus.userData.id); });
+homeBtn.addEventListener('click', (e) => { if (state.mode === 'focus' && !fly) { e.stopPropagation(); closeFocus(); } });   // no site ampliado, o clique fora do site (listener do document) já volta
 addEventListener('keydown', (e) => { if (e.key !== 'Escape') return; if (state.mode === 'focus') closeFocus(); else if (state.mode === 'screen' && site.classList.contains('show')) closeScreen(); });
 
 // ---------- câmera livre, com os controles do Fusion 360 (ferramenta de modelagem, não aparece para visitantes) ----------
@@ -2068,20 +2089,28 @@ canvas.addEventListener('wheel', (e) => {
 const f3 = (v) => `${v.x.toFixed(3)}, ${v.y.toFixed(3)}, ${v.z.toFixed(3)}`;
 const freeReadout = () => { if (state.mode === 'free') freeXYZ.textContent = `pos V(${f3(cam.pos)})  ·  look V(${f3(cam.look)})`; };
 
-// ---------- etiqueta presa por barbante ----------
-let swingT0 = 0;
-const toScreen = (v) => { const p = v.clone().project(camera); return { x: (p.x + 1) / 2 * W, y: (1 - p.y) / 2 * H }; };
-function placeTag(t) {
-  if (state.mode !== 'focus' || !tag.classList.contains('show')) return;
-  const m = P[state.focus.userData.id], a = toScreen(m.anchor.clone().applyAxisAngle(V(0, 1, 0), m.yaw).add(m.at));
-  const narrow = isNarrow();   // celular em pé: etiqueta centralizada embaixo, o objeto fica livre em cima
-  const x = narrow ? (W - 280) / 2 : Math.min(W - 300, a.x + Math.max(150, W * 0.13)), y = narrow ? Math.min(H * 0.6, H - 240) : Math.min(H - 200, Math.max(20, a.y - 20));
-  tag.style.transform = 'translate(' + x + 'px,' + y + 'px)';
-  const k = (t - swingT0) / 1000, ang = 8 * Math.exp(-k * 2) * Math.cos(k * 6.5);
-  tag.querySelector('.swing').style.transform = 'rotate(' + ang + 'deg)';
-  const hx = x + (tag.classList.contains('back') ? 260 : 20), hy = y + 20, sag = 26 + Math.abs(hx - a.x) * 0.12;
-  stringPath.setAttribute('d', 'M' + a.x + ' ' + a.y + ' Q' + (a.x + hx) / 2 + ' ' + (Math.max(a.y, hy) + sag) + ' ' + hx + ' ' + hy);
+// ---------- brilho de entrada: os objetos clicáveis clareiam um a um (ao entrar, e uma vez mais se a pessoa ficar 15 s sem abrir nada) ----------
+const PULSE_GAIN = 0.2;
+const pulses = [];
+const pulseMats = (g) => { const set = new Set(); g.traverse((o) => { (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => { if (m && m.emissive && m.emissive.getHex() === 0 && !m.emissiveMap) set.add(m); }); }); return [...set]; };
+function hintObjects() {
+  if (state.mode !== 'desk' || pulses.length) return;
+  const now = performance.now();
+  [...clickables].sort((a, b) => a.position.x - b.position.x).forEach((g, i) => pulses.push({ g, mats: g.userData.pm || (g.userData.pm = pulseMats(g)), t0: now + i * 380 }));
 }
+function pulseTick(t) {
+  for (let i = pulses.length - 1; i >= 0; i--) {
+    const p = pulses[i], k = (t - p.t0) / 1100; if (k < 0) continue;
+    const a = k >= 1 ? 0 : Math.sin(Math.PI * k);
+    p.mats.forEach((m) => { m.emissive.setHex(a ? 0xfff1dc : 0); m.emissiveIntensity = a ? a * PULSE_GAIN : 1; });
+    if (p.g === monitor) glow.intensity = 0.9 + a * 1.8;
+    if (k >= 1) pulses.splice(i, 1);
+  }
+}
+let idleT = null, opened = false;
+const noteOpened = () => { opened = true; clearTimeout(idleT); };
+window.__veil.onStart = () => { setTimeout(hintObjects, 1000); idleT = setTimeout(() => { if (!opened) hintObjects(); }, 16000); };
+if (/debug/.test(location.search)) window.__hint = hintObjects;
 
 // ---------- animações: as do próprio modelo, ligadas no hover/foco ----------
 const awake = { drone: 0, bike: 0, robo: 0, toddy: 0 };
@@ -2170,7 +2199,7 @@ function frame(t) {
   camera.position.copy(cam.pos).add(V(panMax ? 0 : mouseS.x * 0.055, -mouseS.y * 0.03, 0)); camera.lookAt(cam.look.x + mouseS.x * panMax, cam.look.y, cam.look.z);
   cssCamera.fov = camera.fov; cssCamera.aspect = camera.aspect; cssCamera.updateProjectionMatrix();
   cssCamera.position.copy(camera.position).multiplyScalar(K); cssCamera.quaternion.copy(camera.quaternion);
-  animate(dt, t); placeTag(t); freeReadout();
+  animate(dt, t); pulseTick(t); freeReadout();
   renderer.render(scene, camera); cssRenderer.render(cssScene, cssCamera);
   if (first) { first = false; window.__veil.done(); if (/export/.test(location.search)) { exportGLB().catch((e) => { window.__glbInfo = { error: String(e) }; }); return; } }
   requestAnimationFrame(frame);
