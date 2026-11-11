@@ -928,7 +928,7 @@ const screenMatPlaceholder = new THREE.MeshBasicMaterial({ map: screenTex, toneM
 const screen = add(new THREE.PlaneGeometry(SCREEN.w, SCREEN.h), new THREE.MeshBasicMaterial({ color: 0x000000, opacity: 0, blending: THREE.NoBlending, side: THREE.DoubleSide }), monitor, 0, SCREEN.y, SCREEN.z + 0.0004);
 
 // site do Framer dentro do monitor: um iframe de 1600x1000 px na camada CSS3D, no mesmo lugar e tamanho da tela (escala K: 1 m = 1000 px)
-const SITE_URL = 'https://resilient-clarity-459683.framer.app', siteUrl = () => SITE_URL + (I18N.lang === 'pt' ? '/pt/?lang=pt' : '/?lang=en'),   // o ?lang= faz o site respeitar a escolha daqui (senão o Framer redireciona pelo idioma do navegador) SITE_FILL = 0.95, SITE_SCROLL = 2.2;   // fração da janela que o site ocupa quando ampliado
+const SITE_URL = 'https://felipecollucci.framer.website', siteUrl = () => SITE_URL + (I18N.lang === 'pt' ? '/pt/?lang=pt' : '/?lang=en'), SITE_FILL = 0.95, SITE_SCROLL = 2.2;   // o ?lang= faz o site respeitar a escolha daqui (senão o Framer redireciona pelo idioma do navegador); SITE_FILL: fração da janela que o site ocupa quando ampliado
 const K = 1000, cssScene = new THREE.Scene(), cssRenderer = new CSS3DRenderer(), cssCamera = new THREE.PerspectiveCamera(40, 1, 0.02 * K, 50 * K);
 cssRenderer.domElement.id = 'css3d'; document.body.insertBefore(cssRenderer.domElement, canvas);
 const siteFrame = document.createElement('div'); siteFrame.className = 'screen-frame'; siteFrame.style.cssText = 'width:1600px;height:1000px';
