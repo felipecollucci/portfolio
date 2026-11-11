@@ -3,6 +3,36 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
+<script>
+// ?perf: o painel nasce AQUI, antes do motor 3D e da cena, e mostra o carregamento ao vivo (página, motor 3D, cada etapa da cena, rede). Depois do carregamento o script do módulo assume o mesmo painel (fps, quadros, aparelho). Sem ?perf este bloco não faz nada.
+if (/perf/.test(location.search)) (function () {
+  var box = document.createElement('pre'); box.id = 'perf';
+  box.style.cssText = 'position:fixed;left:6px;top:6px;z-index:99999;margin:0;padding:6px 8px;font:11px/1.35 ui-monospace,Menlo,Consolas,monospace;color:#d7ffd0;background:rgba(0,0,0,.78);border-radius:6px;pointer-events:none;white-space:pre;max-width:96vw;overflow:hidden';
+  document.documentElement.appendChild(box);
+  var P = window.__perf = { box: box, secs: [], last: performance.now(), live: false, ready: null, modulo: null, modelos: null, espera: 0 };
+  var sec = function (ms) { return (ms / 1000).toFixed(1) + ' s'; };
+  var net = function () { var n = performance.getEntriesByType('navigation')[0], r = performance.getEntriesByType('resource'), b = (n ? n.transferSize : 0) + r.reduce(function (a, e) { return a + (e.transferSize || 0); }, 0); return b ? (b / 1048576).toFixed(2) + ' MB em ' + (r.length + 1) + ' arquivos' : 'nada (cache, ou o navegador não informa)'; };
+  P.slowest = function () { return P.secs.slice().sort(function (a, b) { return b[1] - a[1]; }).slice(0, 3).map(function (s) { return s[0] + ' ' + sec(s[1]); }).join(' · '); };
+  P.draw = function () {
+    if (P.live) return;
+    var n = performance.getEntriesByType('navigation')[0], three = performance.getEntriesByType('resource').filter(function (e) { return /three\.module/.test(e.name); })[0], s = P.secs, L = [];
+    L.push('PERF  ' + (P.ready == null ? 'carregando… ' + sec(performance.now()) : 'pronto em ' + sec(P.ready) + ' · medindo os quadros…'));
+    L.push('página: ' + (n && n.responseEnd ? sec(n.responseEnd) : 'aguardando…') + ' · motor 3D (three.js): ' + (three ? 'baixado em ' + sec(three.responseEnd) : 'baixando…'));
+    L.push('código iniciou: ' + (P.modulo == null ? 'aguardando o motor 3D…' : 'em ' + sec(P.modulo)) + ' · modelos: ' + (P.modelos == null ? 'ainda não' : 'prontos (esperou ' + sec(P.espera) + ')'));
+    L.push('cena: ' + s.length + ' etapas montadas' + (s.length ? ' · última: ' + s[s.length - 1][0] + ' (' + sec(s[s.length - 1][1]) + ')' : ''));
+    if (s.length) L.push('mais lentas: ' + P.slowest());
+    L.push('baixado da rede: ' + net());
+    box.textContent = L.join('\n');
+  };
+  P.event = function (k) { P[k] = performance.now(); P.last = P[k]; P.draw(); };
+  // fim de uma etapa da cena: guarda quanto ela levou, atualiza o painel e dá uma pausa curta para a tela pintar (a pausa não conta no tempo da etapa)
+  P.step = function (name) {
+    P.secs.push([name, performance.now() - P.last]); P.draw();
+    return new Promise(function (ok) { var done = false, go = function () { if (done) return; done = true; P.last = performance.now(); ok(); }; requestAnimationFrame(function () { setTimeout(go, 0); }); setTimeout(go, 80); });
+  };
+  setInterval(P.draw, 200); P.draw();
+})();
+</script>
 <title>Felipe Collucci · escritório</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Funnel+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -696,6 +726,9 @@ return {
 })();
 
 import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer.js';
+const T0 = { modulo: performance.now() };   // marcas de tempo (ms desde que a página foi pedida) para o painel ?perf: aqui o motor 3D já chegou e o código começa a rodar
+const PERF = !!window.__perf, perfStep = (name) => window.__perf.step(name);   // com ?perf, cada etapa da cena registra o tempo e deixa o painel atualizar
+if (PERF) window.__perf.event('modulo');
 
 // ===================== CONTEÚDO (vem de Profissional/perfil.md) =====================
 const I18N = window.__i18n;
@@ -790,14 +823,14 @@ const focusLight = new THREE.PointLight(0xfff2e0, 0, 0.7, 1.5); scene.add(focusL
 const room = group(scene);
 // seções do ambiente (para a exportação ao Blender): cada mark() abre uma seção com os objetos criados depois dele
 const SECTIONS = [], mark = (name) => SECTIONS.push([name, room.children.length]);
-mark('Parede e mesa');
+mark('Parede e mesa'); if (PERF) await perfStep('Parede e mesa');
 add(new THREE.PlaneGeometry(4.2, 2.6), mat(0xffffff, { map: wallTex, roughness: 0.9, envMapIntensity: 0.15 }), room, 0, 1.3, -0.47);
 // mesa de nogueira com borda arredondada
 rbox(2.6, 0.045, 0.8, 0.012, walnutM, room, 0, 0.7175, -0.08, 4);
 // (a frente da mesa agora é aberta, com gaveteiros e PC embaixo: veja a seção "Chão e embaixo da mesa")
 
 // ---------- pegboard metálico com ferramentas ----------
-mark('Pegboard');
+mark('Pegboard'); if (PERF) await perfStep('Pegboard');
 const DROP = 0.02;   // o pegboard e tudo que está preso nele foi abaixado 2 cm (valor negativo = sobe)
 const PB = { w: 0.86, h: 0.48, y: 1.29 - DROP, z: -0.44 };
 rbox(PB.w, PB.h, 0.012, 0.01, mat(C.board, { roughness: 0.6, metalness: 0.3 }), room, 0, PB.y, PB.z);
@@ -848,7 +881,7 @@ driverRack(1.512); [C.toolBlue, C.toolBlue, C.red, C.yellow, C.yellow].forEach((
 driverRack(1.382); [0, 1, 2, 3, 4].forEach((i) => driver(0.165 + i * 0.035, 1.34, C.dark, C.red));
 
 // ---------- prateleiras de nogueira com mãos-francesas pretas ----------
-mark('Prateleiras');
+mark('Prateleiras'); if (PERF) await perfStep('Prateleiras');
 const shelf = (x, y) => {
   rbox(0.56, 0.024, 0.2, 0.005, shelfM, room, x, y, -0.36, 3);
   [-0.2, 0.2].forEach((dx) => { const b = mat(C.bracket, { metalness: 0.4, roughness: 0.5 });
@@ -924,7 +957,7 @@ rbox(0.065, 0.27, 0.02, 0.008, mat(C.graphite, { roughness: 0.4, metalness: 0.4 
 tube([[0.0, 0.8, SCREEN.z - 0.085], [0.03, 0.76, SCREEN.z - 0.12], [0.12, 0.745, -0.43]], 0.004, mat(C.dark, { roughness: 0.6 }), room, 20, 8);
 
 // ---------- mousepad azul com costura ----------
-mark('Mousepad');
+mark('Mousepad'); if (PERF) await perfStep('Mousepad');
 const PAD = { w: 1.06, d: 0.42, x: 0.03, z: 0.06 };
 rbox(PAD.w, 0.004, PAD.d, 0.002, mat(C.blue, { roughness: 0.92, envMapIntensity: 0.1 }), room, PAD.x, 0.742, PAD.z, 2);
 (() => { const s = new THREE.Shape(), w = PAD.w / 2 - 0.006, d = PAD.d / 2 - 0.006, r = 0.012;
@@ -933,7 +966,7 @@ rbox(PAD.w, 0.004, PAD.d, 0.002, mat(C.blue, { roughness: 0.92, envMapIntensity:
   add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), 320, 0.0012, 4, true), mat(0x17286f, { roughness: 1 }), room); })();
 
 // ---------- teclado de perfil baixo com layout real ----------
-mark('Teclado');
+mark('Teclado'); if (PERF) await perfStep('Teclado');
 (() => {
   const g = group(room, 0, 0.744, 0.095); g.rotation.x = 0.035;
   const U = 0.0285, gap = 0.0035;
@@ -958,7 +991,7 @@ mark('Teclado');
 })();
 
 // ---------- mouse ergonômico sem fio ----------
-mark('Mouse');
+mark('Mouse'); if (PERF) await perfStep('Mouse');
 (() => {
   const g = group(room, 0.29, 0.744, 0.205); g.rotation.y = -0.12;
   const geo = new THREE.SphereGeometry(0.034, 40, 24); const p = geo.attributes.position;
@@ -970,7 +1003,7 @@ mark('Mouse');
 })();
 
 // ---------- luminária articulada com molas ----------
-mark('Luminária');
+mark('Luminária'); if (PERF) await perfStep('Luminária');
 // base no canto de trás à esquerda; o braço se estende sobre a mesa e a cúpula aponta para a área de trabalho (multímetro e solda)
 (() => {
   const B = V(-0.84, 0.742, -0.22), T = V(-0.46, 0.742, -0.05);              // base e ponto iluminado
@@ -1006,7 +1039,7 @@ mark('Luminária');
 })();
 
 // ---------- estação de solda (entre o teclado e o monitor, ao lado dos robôs; o ferro inclina para a esquerda, longe deles) ----------
-mark('Estação de solda');
+mark('Estação de solda'); if (PERF) await perfStep('Estação de solda');
 (() => {
   const g = group(room, 0.16, 0.742, -0.195); g.rotation.y = Math.PI - 0.2;
   const dk = mat(0x232428, { roughness: 0.45, metalness: 0.3 }), st = mat(C.steel, METAL);
@@ -1025,7 +1058,7 @@ mark('Estação de solda');
 })();
 
 // ---------- multímetro (capa laranja, visor, seletor, bornes, pontas de prova) ----------
-mark('Multímetro');
+mark('Multímetro'); if (PERF) await perfStep('Multímetro');
 (() => {
   const g = group(room, -0.36, 0.742, -0.2); g.rotation.set(-0.3, 0.22, 0);
   rbox(0.09, 0.165, 0.036, 0.012, mat(0xdc7420, { roughness: 0.7 }), g, 0, 0.0825, 0);
@@ -1063,7 +1096,7 @@ mark('Multímetro');
 })();
 
 // ---------- fone over-ear deitado ----------
-mark('Fone');
+mark('Fone'); if (PERF) await perfStep('Fone');
 (() => {
   // dobrado e deitado, como fones de conchas giratórias: as conchas viradas para baixo e o arco deitado na mesa, atrás delas.
   // cada garfo abraça a metade de trás da concha (pinos nas laterais) e o arco sai do meio do garfo, para trás
@@ -1092,7 +1125,7 @@ mark('Fone');
 })();
 
 // ---------- caneca de cerâmica ----------
-mark('Caneca');
+mark('Caneca'); if (PERF) await perfStep('Caneca');
 (() => {
   const g = group(room, -0.7, 0.742, -0.19); g.rotation.y = 0.35;   // ao lado da base da luminária
   const cm = mat(C.cream, { roughness: 0.3 });
@@ -1102,7 +1135,7 @@ mark('Caneca');
 })();
 
 // ---------- paquímetro digital ----------
-mark('Paquímetro');
+mark('Paquímetro'); if (PERF) await perfStep('Paquímetro');
 (() => {
   // deitado no mousepad entre o mouse e o caderno, bicos externos para trás (sem passar da borda), medindo 12,70 mm
   const g = group(room, 0.428, 0.744, 0.247); g.rotation.y = 0.02;
@@ -1133,7 +1166,7 @@ mark('Paquímetro');
 })();
 
 // ---------- impressora 3D (como a da imagem D): base, mesa móvel, pórtico de duas colunas, cabeçote e carretéis em cima ----------
-mark('Impressora 3D');
+mark('Impressora 3D'); if (PERF) await perfStep('Impressora 3D');
 // tudo encaixado: as colunas nascem de sapatas na base, a viga X corre em carros nas colunas, os carretéis giram num eixo sobre a travessa
 (() => {
   const g = group(room, 0.7, 0.742, -0.16);
@@ -1215,7 +1248,7 @@ const hand = (g, text, x, y, size, col = '#26282e') => { g.font = `700 ${size}px
 const toLocal = (g, x, y, z) => g.worldToLocal(V(x, y, z)).toArray();
 
 // ---------- papéis: esquema elétrico, desenho técnico, código de cores, pinagem, lista, rascunho, post-its ----------
-mark('Papéis e post-its');
+mark('Papéis e post-its'); if (PERF) await perfStep('Papéis e post-its');
 const schematicTex = (title) => canvasTex(512, 680, (g, w, h) => {
   g.fillStyle = PAPER; g.fillRect(0, 0, w, h); lineGrid(g, w, h, 16, 'rgba(44,62,102,.09)');
   g.strokeStyle = INK; g.fillStyle = INK; g.lineWidth = 2.5; g.strokeRect(16, 16, w - 32, h - 32);
@@ -1324,7 +1357,7 @@ pinned(-0.045, 1.305 - DROP, PB.z + 0.009, 0.045, 0.045, noteTex(['ESC', 'v2 ok'
 pinned(0.035, 1.372 - DROP, PB.z + 0.009, 0.12, 0.08, pinoutTex, -0.02, C.yellow).position.x += 0;
 
 // ---------- pegboard: mais ferramentas penduradas ----------
-mark('Pegboard (extras)');
+mark('Pegboard (extras)'); if (PERF) await perfStep('Pegboard (extras)');
 const tapeRoll = (parent, color, R = 0.025, r = 0.016, w = 0.019) => lathe([[r, -w / 2], [R, -w / 2], [R, w / 2], [r, w / 2], [r, -w / 2]], mat(color, { roughness: 0.45 }), parent, 0, 0, 0, 36);
 const solderSpool = (parent, R = 0.022) => { const g = group(parent);
   const wire = canvasTex(64, 128, (c, w, h) => { c.fillStyle = '#a6a9ae'; c.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 3) { c.fillStyle = 'rgba(0,0,0,.22)'; c.fillRect(0, y, w, 1); } });
@@ -1366,7 +1399,7 @@ const ps1 = solderSpool(tools); ps1.position.set(0.05, 1.4922, 0.018); ps1.rotat
 })();
 
 // ---------- prateleiras: potes de peças, caixas ----------
-mark('Prateleiras (potes e caixas)');
+mark('Prateleiras (potes e caixas)'); if (PERF) await perfStep('Prateleiras (potes e caixas)');
 // caixas e componentes de eletrônica (no lugar dos potes), na prateleira de cima à esquerda
 (() => {
   const Y = 1.312, dk = mat(0x2b2f38, { roughness: 0.5 });
@@ -1433,7 +1466,7 @@ mark('Prateleiras (potes e caixas)');
 })();
 
 // ---------- bancada: esquema e plaquinha na terceira mão (na luz da luminária); protoboard e Arduino na frente do teclado ----------
-mark('Bancada eletrônica');
+mark('Bancada eletrônica'); if (PERF) await perfStep('Bancada eletrônica');
 deskSheet(-0.56, -0.17, 0.148, 0.21, schematicTex('SCH-02 · SENSOR'), 0.15);
 const PCB = group(room, -0.585, 0.8, -0.225); PCB.rotation.set(0.35, 0.1, 0);
 (() => { // plaquinha de circuito presa nas garras da terceira mão
@@ -1501,7 +1534,7 @@ const PCB = group(room, -0.585, 0.8, -0.225); PCB.rotation.set(0.35, 0.1, 0);
 })();
 
 // ---------- terceira mão com lupa ----------
-mark('Terceira mão');
+mark('Terceira mão'); if (PERF) await perfStep('Terceira mão');
 // base pesada com dois braços flexíveis (pescoço de ganso) que seguram a placa pelas bordas, e a lupa numa haste atrás
 (() => {
   const g = group(room, -0.6, 0.742, -0.33); g.rotation.y = 0.1;
@@ -1546,7 +1579,7 @@ mark('Terceira mão');
 })();
 
 // ---------- gaveteiro de componentes ----------
-mark('Gaveteiro');
+mark('Gaveteiro'); if (PERF) await perfStep('Gaveteiro');
 (() => {
   const g = group(room, -0.48, 0.742, -0.395); g.rotation.y = 0.12;
   const W = 0.13, H = 0.16, D = 0.1;
@@ -1567,7 +1600,7 @@ mark('Gaveteiro');
 })();
 
 // ---------- fonte de bancada com osciloscópio em cima ----------
-mark('Fonte e osciloscópio');
+mark('Fonte e osciloscópio'); if (PERF) await perfStep('Fonte e osciloscópio');
 (() => {
   const ps = group(room, 0.47, 0.742, -0.37); ps.rotation.y = -0.3;
   const body = mat(0x3a3c42, { roughness: 0.45, metalness: 0.3 }), dk = mat(0x1d1e22, { roughness: 0.4 });
@@ -1612,7 +1645,7 @@ mark('Fonte e osciloscópio');
 })();
 
 // ---------- bagunça na mesa ----------
-mark('Bagunça na mesa');
+mark('Bagunça na mesa'); if (PERF) await perfStep('Bagunça na mesa');
 (() => { // chave de fenda solta na frente do monitor
   const g = group(room, -0.13, 0.744, -0.12); g.rotation.y = 0.25;
   const h = group(g, 0, 0.0076, 0); h.rotation.z = Math.PI / 2;
@@ -1696,7 +1729,7 @@ pinned(0.52, 1.38, -0.4685, 0.07, 0.09, canvasTex(224, 288, (c, w, h) => {   // 
 // LEDs do PC gamer: cada item é [material ou luz, deslocamento de cor]; rgbTick() gira a cor com o tempo
 const rgbLeds = [], rgbLights = [];
 const rgbTick = (t) => { const hu = (t * 0.00007) % 1; rgbLeds.forEach(([m, o]) => m.color.setHSL((hu + o) % 1, 1, 0.55)); rgbLights.forEach(([l, o]) => l.color.setHSL((hu + o) % 1, 1, 0.55)); };
-mark('Chão e embaixo da mesa');
+mark('Chão e embaixo da mesa'); if (PERF) await perfStep('Chão e embaixo da mesa');
 (() => {
   const dk = mat(C.walnutDark, { roughness: 0.7 }), body = mat(0x2b2c31, { roughness: 0.55, metalness: 0.15 }), front = mat(0x3a3d45, { roughness: 0.5, metalness: 0.1 }), st = mat(C.steel, METAL);
   // chão de tábuas escuras, da parede até bem à frente da mesa
@@ -1773,7 +1806,7 @@ mark('Chão e embaixo da mesa');
 
 // ---------- janela de correr com persiana rolô e ar-condicionado de janela em cima, no canto direito da parede (logo depois do fim da mesa) ----------
 // fica fora da vista normal de propósito: aparece em telas bem largas e na câmera livre. Não tem luz própria (lá fora é noite), então não pesa na iluminação
-mark('Janela e ar-condicionado');
+mark('Janela e ar-condicionado'); if (PERF) await perfStep('Janela e ar-condicionado');
 (() => {
   const WX = 1.72, WW = 0.62, WH = 0.9, Y0 = 1.0, YC = Y0 + WH / 2, YT = Y0 + WH;   // centro em x, largura, altura, peitoril, meio e topo do vão
   const g = group(room, WX, 0, -0.47);   // encostado na parede do fundo
@@ -1835,7 +1868,7 @@ mark('Janela e ar-condicionado');
   rbox(0.045, 0.008, 0.002, 0.001, alu, g, AX - 0.1, AY0 + 0.092, AZ + 0.003, 1);
 })();
 
-mark('Parede (decoração)');
+mark('Parede (decoração)'); if (PERF) await perfStep('Parede (decoração)');
 (() => {
   const WZ = -0.4685;
 
@@ -1881,7 +1914,8 @@ mark('Parede (decoração)');
 // =====================================================================
 // PROJETOS: os modelos reais, do visualizador
 // =====================================================================
-const models = Object.fromEntries(await modelsP);
+const _w0 = performance.now(); const models = Object.fromEntries(await modelsP); T0.modelos = performance.now();
+if (PERF) { window.__perf.espera = T0.modelos - _w0; window.__perf.event('modelos'); }
 const P = {};
 // coloca um modelo: holder (clicável, posição e giro) -> fit (escala e orientação, apoiado na superfície) -> root do modelo
 function placeModel(id, { scale, fitWidth, rotX = 0, yaw = 0, at, pre = 0, cycle = 0 }) {
@@ -1917,13 +1951,13 @@ const resetPose = (m) => {
   m.elapsed = 0; m.pose.forEach(([o, p, q]) => { o.position.copy(p); o.quaternion.copy(q); });
 };
 // drone na prateleira de cima à esquerda
-placeModel('drone', { fitWidth: 0.3, at: V(-0.58, 1.3125, -0.335), yaw: 0.3 });   // deslocado para a direita e um pouco para a frente, como no círculo verde
+placeModel('drone', { fitWidth: 0.3, at: V(-0.58, 1.3125, -0.335), yaw: 0.3 }); if (PERF) await perfStep('Modelo drone');   // deslocado para a direita e um pouco para a frente, como no círculo verde
 // a equipe (Blitzen + Killbot) em tamanho real (1 unidade = 16 mm), à direita do mouse
-placeModel('robo', { scale: 0.016, at: V(0.43, 0.744, 0.03), yaw: -0.1 });
+placeModel('robo', { scale: 0.016, at: V(0.43, 0.744, 0.03), yaw: -0.1 }); if (PERF) await perfStep('Modelo robo');
 // o bicicletário como miniatura na prateleira de cima à direita; a caixa cobre o percurso da bicicleta
-placeModel('bike', { fitWidth: 0.38, at: V(0.7, 1.3125, -0.37), yaw: 0.33 + Math.PI, pre: 12.95, cycle: 22 });   // ponta esquerda levemente para a frente (ângulo suave, de lado), girado 180° para a bicicleta ficar do lado direito e descer para a área livre; mais para dentro da prateleira (z -0,37 e x 0,70)
+placeModel('bike', { fitWidth: 0.38, at: V(0.7, 1.3125, -0.37), yaw: 0.33 + Math.PI, pre: 12.95, cycle: 22 }); if (PERF) await perfStep('Modelo bike');   // ponta esquerda levemente para a frente (ângulo suave, de lado), girado 180° para a bicicleta ficar do lado direito e descer para a área livre; mais para dentro da prateleira (z -0,37 e x 0,70)
 // o Toddy em tamanho real (1 unidade = 10 mm), jogado na mesa à esquerda e encostado na caneca, com a frente para a câmera
-placeModel('toddy', { scale: 0.01, rotX: -Math.PI / 2, at: V(-0.6, 0.742, 0.06), yaw: 0.3 });
+placeModel('toddy', { scale: 0.01, rotX: -Math.PI / 2, at: V(-0.6, 0.742, 0.06), yaw: 0.3 }); if (PERF) await perfStep('Modelo toddy');
 P.toddy.built.root.traverse((o) => { if (o.material && o.material.color) { o.material.color.multiplyScalar(0.8); o.material.roughness = 0.88; o.material.metalness = 0; o.material.envMapIntensity = 0.35; if (o.material.bumpScale) o.material.bumpScale = 0.4; } });   // o branco do pacote estourava com as luzes da mesa: fosco, sem metal e com pouco reflexo do ambiente
 const TODDY_HELD = V(0, 0.125, 0);   // centro do pacote quando pego, acima do ponto onde está deitado
 P.toddy.anchor = V(0.06, TODDY_HELD.y + 0.085, 0);
@@ -2291,21 +2325,23 @@ const clock = new THREE.Clock();
 let first = true;
 // ---------- modo de teste de desempenho (?perf): painel no canto com fps, tempo de cada quadro, desenhos por quadro e dados do aparelho. Só liga com ?perf no endereço; fora disso não existe e não custa nada ----------
 const perf = /perf/.test(location.search) ? (() => {
-  const box = document.createElement('pre'); box.id = 'perf';
-  box.style.cssText = 'position:fixed;left:6px;top:6px;z-index:99999;margin:0;padding:6px 8px;font:11px/1.35 ui-monospace,Menlo,Consolas,monospace;color:#d7ffd0;background:rgba(0,0,0,.78);border-radius:6px;pointer-events:none;white-space:pre;max-width:96vw;overflow:hidden';
-  document.body.appendChild(box);
+  const box = window.__perf.box;   // criado lá no começo da página
   const gl = renderer.getContext(), ext = gl.getExtension('WEBGL_debug_renderer_info'), gpu = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : 'não informado';
-  const N = 120, dts = [], cpus = []; let last = 0, ready = null, shown = 0;
+  const N = 120, dts = [], cpus = []; let last = 0, ready = null, shown = 0, firstStart = null, firstCpu = null, lastCpu = 0;
   const q = (a, p) => { const b = a.slice().sort((x, y) => x - y); return b[Math.min(b.length - 1, Math.floor(b.length * p))]; };
   const f1 = (v) => (v == null ? '-' : v.toFixed(1));
-  const nav = navigator, mem = performance.memory;
+  const nav = navigator, mem = performance.memory, navE = performance.getEntriesByType('navigation')[0];
+  const sec = (ms) => (ms / 1000).toFixed(1) + ' s';
+  const rede = () => { const r = performance.getEntriesByType('resource'), b = (navE ? navE.transferSize : 0) + r.reduce((a, e) => a + (e.transferSize || 0), 0); return b ? (b / 1048576).toFixed(2) + ' MB em ' + (r.length + 1) + ' arquivos' : 'nada (tudo veio do cache ou o navegador não informa)'; };
   const ua = (nav.userAgent.match(/\(([^)]*)\)/) || [0, '?'])[1].slice(0, 60);
   return {
-    ready() { ready = performance.now(); },
+    first(p0) { firstStart = p0; },
+    ready() { ready = performance.now(); firstCpu = lastCpu; window.__perf.ready = ready; window.__perf.draw(); },
     tick(t, cpu) {
+      lastCpu = cpu;
       if (last) { const d = t - last; if (d < 1000) { dts.push(d); cpus.push(cpu); if (dts.length > N) { dts.shift(); cpus.shift(); } } }
       last = t;
-      if (t - shown < 500 || dts.length < 10) return; shown = t;
+      if (t - shown < 500 || dts.length < 10) return; shown = t; window.__perf.live = true;
       const mean = dts.reduce((a, b) => a + b, 0) / dts.length, i = renderer.info.render, pr = renderer.getPixelRatio();
       box.textContent = [
         'PERF  fps ' + f1(1000 / mean) + '   (últimos ' + dts.length + ' quadros)',
@@ -2314,7 +2350,11 @@ const perf = /perf/.test(location.search) ? (() => {
         'trabalho do JS por quadro: ' + f1(q(cpus, 0.5)) + ' ms (mediana)',
         'desenhos por quadro: ' + i.calls + ' · triângulos: ' + Math.round(i.triangles / 1000) + ' mil',
         'tela: ' + innerWidth + '×' + innerHeight + ' · escala ' + pr + ' → ' + canvas.width + '×' + canvas.height + ' px',
-        'pronto em: ' + (ready == null ? 'carregando…' : (ready / 1000).toFixed(1) + ' s') + ' · modo: ' + state.mode,
+        'pronto em: ' + (ready == null ? 'carregando…' : sec(ready) + ' (até o 1º quadro, desde que a página foi pedida)') + ' · modo: ' + state.mode,
+        'etapas: página ' + sec(navE.responseEnd) + ' · motor 3D ' + sec(T0.modulo - navE.responseEnd) + ' · modelos (espera) ' + sec(window.__perf.espera) + ' · montar a cena ' + sec(window.__perf.secs.reduce((s, e) => s + e[1], 0)),
+        '1º quadro: esperou ' + sec(firstStart - T0.montada) + ' para o navegador chamar · desenhou em ' + sec(firstCpu) + ' (compilar e enviar à GPU)',
+        'mais lentas: ' + window.__perf.slowest() + '   (pausas do painel não contam)',
+        'baixado da rede: ' + rede(),
         'GPU: ' + gpu,
         'núcleos: ' + (nav.hardwareConcurrency || '-') + ' · memória: ' + (nav.deviceMemory ? '≥' + nav.deviceMemory + ' GB' : '-') + (mem ? ' · heap ' + Math.round(mem.usedJSHeapSize / 1048576) + ' MB' : ''),
         'toque: ' + (MOBILE ? 'sim' : 'não') + ' · ' + ua,
@@ -2325,6 +2365,7 @@ const perf = /perf/.test(location.search) ? (() => {
 
 function frame(t) {
   const p0 = performance.now();
+  if (first && perf) perf.first(p0);
   const dt = Math.min(0.05, clock.getDelta());
   if (fly) { const k = Math.min(1, (t - fly.t0) / fly.dur), e = ease(k); cam.pos.lerpVectors(fly.fromP, fly.toP, e); cam.look.lerpVectors(fly.fromL, fly.toL, e); if (k >= 1) { const d = fly.done; fly = null; d && d(); } }
   if (orbit && state.mode === 'focus' && !fly) {
@@ -2346,6 +2387,7 @@ function frame(t) {
   if (first) { first = false; window.__veil.done(); if (perf) perf.ready(); if (/export/.test(location.search)) { exportGLB().catch((e) => { window.__glbInfo = { error: String(e) }; }); return; } }
   requestAnimationFrame(frame);
 }
+T0.montada = performance.now();   // a cena está montada; falta só o primeiro quadro
 requestAnimationFrame(frame);
 </script>
 </body>
