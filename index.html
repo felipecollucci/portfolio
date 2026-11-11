@@ -20,7 +20,10 @@
   #veil { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: var(--dark); color: var(--ink); transition: opacity .9s ease; }
   #veil.off { opacity: 0; pointer-events: none; }
   #veil .vbox { width: min(460px, 100% - 48px); }
-  #lang { display: flex; justify-content: flex-start; align-items: center; gap: 4px; margin-top: 6px; font-size: 14px; color: var(--ink-60); }
+  #lang { display: flex; justify-content: center; align-items: center; gap: 6px; margin-top: 6px; font-size: 14px; color: var(--ink-60); }
+  #lang i { width: 1px; height: 14px; background: var(--line); }
+  #veil.ready:not(.off) { cursor: pointer; }
+  #lang { cursor: default; }
   #lang button { font: inherit; letter-spacing: -.01em; color: var(--ink-60); background: none; border: 0; padding: 8px 4px; cursor: pointer; }
   #lang button[aria-pressed="true"] { color: var(--ink); text-decoration: underline; text-underline-offset: 4px; }
   #lang button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
@@ -38,7 +41,7 @@
   .vbar::after { content: ""; position: absolute; inset: 0; width: 30%; background: var(--ink); animation: slide 1.6s cubic-bezier(.5,0,.5,1) infinite; }
   @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(334%); } }
   #veil.ready .vbar { display: none; }
-  #veil #vgo { padding: 14px 22px; animation: rise .6s cubic-bezier(.2,.7,.2,1) backwards; }
+  #veil #vgo { width: 100%; padding: 14px 22px; animation: rise .6s cubic-bezier(.2,.7,.2,1) backwards; }
   #vgo[hidden] { display: none; }
   body.focus canvas#gl { cursor: grab; } body.focus.nodrag canvas#gl { cursor: default; } body.dragging canvas#gl { cursor: grabbing; }
 
@@ -91,7 +94,7 @@
     <li><span>03</span><b data-k="s3"></b></li>
   </ol>
   <div class="vfoot"><div class="vbar"></div><button id="vgo" type="button" hidden data-k="go"></button></div>
-  <div id="lang" role="group" aria-label="Idioma / Language"><button type="button" data-l="pt" aria-pressed="false">Português</button><span aria-hidden="true">·</span><button type="button" data-l="en" aria-pressed="false">English</button></div>
+  <div id="lang" role="group" aria-label="Idioma / Language"><button type="button" data-l="pt" aria-pressed="false">Português</button><i aria-hidden="true"></i><button type="button" data-l="en" aria-pressed="false">English</button></div>
 </div></div>
 <script>
 // Tela de entrada. O escritório começa a carregar na hora, por trás dela. Quando a cena fica pronta, aparece o botão de começar.
@@ -118,10 +121,12 @@
   const v = window.__veil = { loaded: false, started: false, tilt: null, onStart: null };
   const got = (s) => { v.tilt = s; };
   v.done = () => { v.loaded = true; veil.classList.add('ready'); paint(); btn.hidden = false; };
-  btn.addEventListener('click', () => {
+  const start = () => {
+    if (!v.loaded || v.started) return;
     if (ask && v.tilt !== 'granted') D.requestPermission().then(got).catch(() => got('denied'));
     v.started = true; veil.classList.add('off'); if (v.onStart) v.onStart();
-  });
+  };
+  veil.addEventListener('click', (e) => { if (!e.target.closest('#lang')) start(); });   // qualquer toque na tela começa, menos no seletor de idioma
   if (ask) D.requestPermission().then(got).catch(() => {});
 })();
 </script>
