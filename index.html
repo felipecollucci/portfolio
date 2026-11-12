@@ -758,13 +758,25 @@ await Promise.all([document.fonts.load('600 80px "Funnel Sans"'), document.fonts
 
 // ---------- renderizador e cena ----------
 const canvas = document.getElementById('gl');
-const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+// ajustes de teste (só com ?perf): escala=, aa=0|1, sombra=<n>|0, lampada=0, suave=0, luzes=min. Sem ?perf nada disso é lido
+const QP = PERF ? new URLSearchParams(location.search) : null;
+const Q = { escala: null, aa: true, sombra: null, lampada: true, suave: true, luzesMin: false, ativos: [] };
+if (QP) {
+  const num = (k) => { const v = QP.get(k); if (v === null || v === '') return null; const n = Number(v); return Number.isFinite(n) ? n : null; };
+  const esc = num('escala'); if (esc !== null && esc > 0) { Q.escala = esc; Q.ativos.push('escala=' + esc); }
+  if (QP.get('aa') === '0') { Q.aa = false; Q.ativos.push('aa=0'); } else if (QP.get('aa') === '1') Q.ativos.push('aa=1');
+  const som = num('sombra'); if (som !== null && som >= 0) { Q.sombra = som; Q.ativos.push('sombra=' + som); }
+  if (QP.get('lampada') === '0') { Q.lampada = false; Q.ativos.push('lampada=0'); }
+  if (QP.get('suave') === '0') { Q.suave = false; Q.ativos.push('suave=0'); }
+  if (QP.get('luzes') === 'min') { Q.luzesMin = true; Q.ativos.push('luzes=min'); }
+}
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: Q.aa, alpha: true });
 renderer.setClearColor(0x000000, 0);
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, Q.escala || 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.1;
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.shadowMap.enabled = Q.sombra !== 0;
+renderer.shadowMap.type = Q.suave ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
 renderer.shadowMap.autoUpdate = false;   // a cena é quase toda parada: as sombras só são refeitas quando algo que faz sombra se mexe (ver shadowHold, em animate)
 const scene = new THREE.Scene();
 // sem fundo no WebGL: o cinza vem do <body>, e a tela do monitor é um furo por onde se vê a camada CSS3D com o site
@@ -813,13 +825,15 @@ const shelfM = mat(0xffffff, { map: woodTex('#76503a'), roughness: 0.5 });
 // uma luz de destaque (clique) e uma sob a mesa. As luzes azuis e roxas que sobravam tingiam o teclado e os robôs (as de baixo atravessavam o tampo, porque luz sem sombra não é barrada)
 scene.add(new THREE.HemisphereLight(0xbfc3cc, 0x40362e, 0.45));
 const key = new THREE.DirectionalLight(0xfff0e2, 1.5); key.position.set(0.6, 1.9, 2.4); key.target.position.set(0, 0.9, -0.3);
-key.castShadow = true; key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0003; key.shadow.normalBias = 0.006; key.shadow.radius = 5;
+key.castShadow = true; key.shadow.mapSize.set(Q.sombra || 2048, Q.sombra || 2048); key.shadow.bias = -0.0003; key.shadow.normalBias = 0.006; key.shadow.radius = 5;
 Object.assign(key.shadow.camera, { left: -1.3, right: 1.3, top: 1.0, bottom: -0.6, near: 0.5, far: 6 });
 scene.add(key, key.target);
-const lampLight = new THREE.SpotLight(0xffc98a, 5, 2.4, 0.85, 0.8, 1.4); lampLight.castShadow = true; lampLight.shadow.mapSize.set(1024, 1024); lampLight.shadow.bias = -0.0005; lampLight.shadow.normalBias = 0.004; scene.add(lampLight, lampLight.target);
+const lampLight = new THREE.SpotLight(0xffc98a, 5, 2.4, 0.85, 0.8, 1.4); lampLight.castShadow = Q.lampada; lampLight.shadow.mapSize.set(Q.sombra ? Math.max(256, Q.sombra / 2) : 1024, Q.sombra ? Math.max(256, Q.sombra / 2) : 1024); lampLight.shadow.bias = -0.0005; lampLight.shadow.normalBias = 0.004; scene.add(lampLight, lampLight.target);
 const GLOW_I = 1.1;   // força da luz do monitor em repouso
 const glow = new THREE.PointLight(0xc9d6ff, GLOW_I, 1.4, 1.4); glow.position.set(0, 1.05, -0.3); scene.add(glow);   // uma só luz do monitor, no plano da tela: clareia a mesa na frente e faz o halo na parede atrás
 const focusLight = new THREE.PointLight(0xfff2e0, 0, 0.7, 1.5); scene.add(focusLight);
+// ?perf&luzes=min: só a luz geral e o sol; as outras saem da cena (os objetos continuam existindo, então intensity/position seguem funcionando sem efeito)
+if (Q.luzesMin) scene.remove(lampLight, lampLight.target, glow, focusLight);
 
 // =====================================================================
 // AMBIENTE
@@ -1810,7 +1824,7 @@ mark('Chão e embaixo da mesa'); if (PERF) await perfStep('Chão e embaixo da me
   tube([[0.34, 0.02, -0.43], [0.4, 0.01, -0.3], [0.44, 0.03, -0.153]], 0.005, mat(0x16181c, { roughness: 0.6 }), room, 20, 6);
   // fita de LED sob a borda da mesa e uma luz fraca azulada, para o vão não ficar um buraco escuro
   add(new THREE.BoxGeometry(1.2, 0.006, 0.012), new THREE.MeshBasicMaterial({ color: 0x9fb8ff, toneMapped: false }), room, 0, 0.691, 0.29);
-  const under = new THREE.SpotLight(0x9fb4ff, 1.6, 1.6, 1.25, 1, 1.4); under.position.set(0, 0.69, 0.2); under.target.position.set(0, 0, 0.25); scene.add(under, under.target);   // foco apontado para o chão: ilumina o vão sem subir para os objetos em cima da mesa
+  const under = new THREE.SpotLight(0x9fb4ff, 1.6, 1.6, 1.25, 1, 1.4); under.position.set(0, 0.69, 0.2); under.target.position.set(0, 0, 0.25); if (!Q.luzesMin) scene.add(under, under.target);   // foco apontado para o chão: ilumina o vão sem subir para os objetos em cima da mesa
 })();
 
 // ---------- janela de correr com persiana rolô e ar-condicionado de janela em cima, no canto direito da parede (logo depois do fim da mesa) ----------
@@ -2380,8 +2394,17 @@ if (/debug/.test(location.search)) window.__hint = hintObjects;
 
 // ---------- animações: as do próprio modelo, ligadas no hover/foco ----------
 const awake = { drone: 0, bike: 0, robo: 0, toddy: 0 };
-let shadowFrames = 0, shadowHold = 120;   // quadros em que as sombras ainda são refeitas: os primeiros (a cena termina de assentar) e um pouco depois de cada movimento
+let shadowFrames = 0, shadowHold = 20;   // quadros em que as sombras ainda são refeitas: os primeiros (a cena termina de assentar) e um pouco depois de cada movimento
 let toddyHeld = 0;
+// assinatura barata da pose de um projeto (posição, giro e escala de cada peça + holder e fit): muda só quando algo se mexeu de verdade
+const poseSigs = {};
+const poseSig = (m) => {
+  let s = 0, w = 1;
+  const add3 = (o) => { s += w * (o.position.x + 3 * o.position.y + 5 * o.position.z + 7 * o.quaternion.x + 11 * o.quaternion.y + 13 * o.quaternion.z + 17 * o.quaternion.w + 19 * o.scale.x + 23 * o.scale.y + 29 * o.scale.z); w = (w % 7) + 1; };
+  for (let i = 0; i < m.pose.length; i++) add3(m.pose[i][0]);
+  add3(m.holder); add3(m.fit);
+  return s;
+};
 function animate(dt, t) {
   rgbTick(t);
   const active = state.mode === 'desk' ? state.hover : state.focus;
@@ -2411,8 +2434,12 @@ function animate(dt, t) {
   }
   focusLight.intensity += ((focusLight.userData.target || 0) - focusLight.intensity) * Math.min(1, dt * 5);
   // sombras: só os projetos se mexem (animação, levantar, girar no arraste); parado, o mapa de sombra antigo continua valendo
-  let moving = !!active || toddyHeld > 0.002;
-  for (const id in awake) { const sp = P[id].spin; if (awake[id] > 0.002 || Math.abs(sp.pitch) > 0.001 || Math.abs(Math.sin(sp.yaw / 2)) > 0.001) moving = true; }
+  // o projeto aberto/em hover só conta como movimento se a pose mudou desde o quadro anterior (parado, não refaz sombra)
+  let moving = toddyHeld > 0.002 && toddyHeld < 0.998;   // pego e parado não é movimento; só a subida e a descida (awake segue a mesma regra, abaixo)
+  const ap = active && P[active.userData.id];
+  if (ap) { const sg = poseSig(ap), prev = poseSigs[active.userData.id]; poseSigs[active.userData.id] = sg; if (prev !== undefined && Math.abs(sg - prev) > 1e-4) moving = true; }   // 1e-4: as suavizações (ex.: o Toddy se ajeitando) chegam ao destino devagar e mudam décimos de milímetro por quadro; isso não aparece na sombra
+  else for (const id in poseSigs) delete poseSigs[id];   // ao sair, a próxima entrada começa uma comparação nova (o retorno à pose de repouso já é coberto por awake)
+  for (const id in awake) { const sp = P[id].spin; if ((awake[id] > 0.002 && awake[id] < 0.998) || Math.abs(sp.pitch) > 0.001 || Math.abs(Math.sin(sp.yaw / 2)) > 0.001) moving = true; }
   if (moving) shadowHold = Math.max(shadowHold, 20);
   // em movimento, o mapa de sombra é refeito só em quadros alternados (metade do custo; a sombra atrasa no máximo 1 quadro). Os 120 primeiros quadros e os 20 depois que o movimento acaba (shadowHold) refazem todo quadro, então o estado final sempre é desenhado
   shadowFrames++;
@@ -2483,6 +2510,7 @@ const perf = /perf/.test(location.search) ? (() => {
         'engasgos (>33 ms): ' + dts.filter((d) => d > 33).length + ' de ' + dts.length,
         'trabalho do JS por quadro: ' + f1(q(cpus, 0.5)) + ' ms (mediana)',
         'desenhos por quadro: ' + i.calls + ' · triângulos: ' + Math.round(i.triangles / 1000) + ' mil',
+        'ajustes: ' + (Q.ativos.length ? Q.ativos.join(' · ') : 'nenhum'),
         'tela: ' + innerWidth + '×' + innerHeight + ' · escala ' + pr + ' → ' + canvas.width + '×' + canvas.height + ' px',
         'pronto em: ' + (ready == null ? 'carregando…' : sec(ready) + ' (até o 1º quadro, desde que a página foi pedida)') + ' · modo: ' + state.mode,
         'etapas: página ' + sec(navE.responseEnd) + ' · motor 3D ' + sec(T0.modulo - navE.responseEnd) + ' · modelos (espera) ' + sec(window.__perf.espera) + ' · montar a cena ' + sec(window.__perf.secs.reduce((s, e) => s + e[1], 0)),
