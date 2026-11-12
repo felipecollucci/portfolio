@@ -2495,6 +2495,29 @@ const perf = /perf/.test(location.search) ? (() => {
   const sec = (ms) => (ms / 1000).toFixed(1) + ' s';
   const rede = () => { const r = performance.getEntriesByType('resource'), b = (navE ? navE.transferSize : 0) + r.reduce((a, e) => a + (e.transferSize || 0), 0); return b ? (b / 1048576).toFixed(2) + ' MB em ' + (r.length + 1) + ' arquivos' : 'nada (tudo veio do cache ou o navegador não informa)'; };
   const ua = (nav.userAgent.match(/\(([^)]*)\)/) || [0, '?'])[1].slice(0, 60);
+  // relatório: botões "copiar" e "enviar" embaixo do painel; o envio vai para um Formulário Google ligado a uma planilha (o GitHub Pages não recebe dados). Com FORM_URL vazio, só o copiar funciona. O envio automático acontece uma vez, ~15 s depois de a cena ficar pronta
+  const FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfKcIdjqxYpsDhVtjcAHuGQSMdYJ9gm6xrKcdMslLjFlr3lHw/formResponse', FORM_ENTRY = 'entry.516893404';   // formulário "relatorio-perf" do Felipe, ligado a uma planilha
+  let sent = false;
+  const report = () => 'quando: ' + new Date().toLocaleString('pt-BR') + '\nendereço: ' + location.search + '\n' + box.textContent;
+  const bar = document.createElement('div');
+  bar.style.cssText = 'position:fixed;left:6px;z-index:99999;display:flex;gap:6px;font:12px ui-monospace,Menlo,Consolas,monospace';
+  const btn = (label, fn) => { const b = document.createElement('button'); b.textContent = label; b.style.cssText = 'font:inherit;color:#d7ffd0;background:rgba(0,0,0,.78);border:1px solid #d7ffd0;border-radius:5px;padding:6px 10px;cursor:pointer'; for (const ev of ['pointerdown', 'pointerup', 'click', 'touchstart']) b.addEventListener(ev, (e) => e.stopPropagation()); b.addEventListener('click', () => fn(b)); bar.appendChild(b); return b; };
+  const flash = (b, txt) => { const o = b.dataset.o || (b.dataset.o = b.textContent); b.textContent = txt; setTimeout(() => (b.textContent = o), 2500); };
+  btn('copiar relatório', (b) => {
+    const t = report();
+    const old = () => { const a = document.createElement('textarea'); a.value = t; document.body.appendChild(a); a.select(); let ok = false; try { ok = document.execCommand('copy'); } catch (e) {} a.remove(); flash(b, ok ? 'copiado' : 'não deu para copiar'); };
+    if (navigator.clipboard && isSecureContext) navigator.clipboard.writeText(t).then(() => flash(b, 'copiado'), old); else old();
+  });
+  const send = (b) => {
+    if (!FORM_URL) { b && flash(b, 'envio não configurado'); return; }
+    sent = true;
+    fetch(FORM_URL, { method: 'POST', mode: 'no-cors', body: new URLSearchParams({ [FORM_ENTRY]: report() }) })
+      .then(() => sendBtn.textContent = 'enviado ✓ (enviar de novo)', () => sendBtn.textContent = 'falhou (tentar de novo)');
+    sendBtn.textContent = 'enviando…';
+  };
+  const sendBtn = btn(FORM_URL ? 'enviar relatório' : 'enviar (não configurado)', send);
+  document.body.appendChild(bar);
+  const placeBar = () => { bar.style.top = (box.getBoundingClientRect().bottom + 6) + 'px'; };
   return {
     first(p0) { firstStart = p0; },
     ready() { ready = performance.now(); firstCpu = lastCpu; window.__perf.ready = ready; window.__perf.draw(); },
@@ -2521,6 +2544,8 @@ const perf = /perf/.test(location.search) ? (() => {
         'núcleos: ' + (nav.hardwareConcurrency || '-') + ' · memória: ' + (nav.deviceMemory ? '≥' + nav.deviceMemory + ' GB' : '-') + (mem ? ' · heap ' + Math.round(mem.usedJSHeapSize / 1048576) + ' MB' : ''),
         'toque: ' + (MOBILE ? 'sim' : 'não') + ' · ' + ua,
       ].join('\n');
+      placeBar();
+      if (!sent && FORM_URL && ready != null && dts.length >= N && t - ready > 15000) send();
     },
   };
 })() : null;
