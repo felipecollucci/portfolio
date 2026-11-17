@@ -9,7 +9,6 @@ if (/perf/.test(location.search)) (function () {
   var box = document.createElement('pre'); box.id = 'perf';
   box.style.cssText = 'position:fixed;left:6px;top:6px;z-index:99999;margin:0;padding:6px 8px;font:11px/1.35 ui-monospace,Menlo,Consolas,monospace;color:#d7ffd0;background:rgba(0,0,0,.78);border-radius:6px;pointer-events:none;white-space:pre;max-width:96vw;overflow:hidden';
   document.documentElement.appendChild(box);
-  if (/bateria/.test(location.search)) box.style.color = '#ff5a5a';   // bateria de testes rodando: texto vermelho (fica verde no fim)
   var P = window.__perf = { box: box, secs: [], last: performance.now(), live: false, ready: null, modulo: null, modelos: null, espera: 0 };
   var sec = function (ms) { return (ms / 1000).toFixed(1) + ' s'; };
   var net = function () { var n = performance.getEntriesByType('navigation')[0], r = performance.getEntriesByType('resource'), b = (n ? n.transferSize : 0) + r.reduce(function (a, e) { return a + (e.transferSize || 0); }, 0); return b ? (b / 1048576).toFixed(2) + ' MB em ' + (r.length + 1) + ' arquivos' : 'nada (cache, ou o navegador não informa)'; };
@@ -109,6 +108,7 @@ if (/perf/.test(location.search)) (function () {
   @keyframes rise { from { opacity: 0; transform: translateY(16px); } to { opacity: 1; transform: none; } }
   #card .meta { font-size: 13px; font-weight: 500; color: var(--ink-60); }
   #card h3 { margin: 10px 0 0; font-size: 34px; line-height: 1.02; font-weight: 700; letter-spacing: -.04em; }
+  #card .desc b { font-weight: 700; color: var(--ink); }
   #card .desc { margin: 14px 0 0; font-size: 16px; line-height: 1.45; letter-spacing: -.01em; color: rgba(236,232,223,.82); }
   #card .row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 16px; margin-top: 22px; }
   #card .go, #vgo { font: inherit; font-size: 16px; font-weight: 500; letter-spacing: -.02em; color: var(--dark); background: var(--ink); border: 0; border-radius: 4px; padding: 12px 18px; cursor: pointer; transition: opacity .2s; }
@@ -129,7 +129,7 @@ if (/perf/.test(location.search)) (function () {
   #sitefull .bar { position: absolute; left: 12px; right: 12px; bottom: calc(12px + env(safe-area-inset-bottom)); z-index: 1; display: flex; align-items: center; justify-content: center; gap: 8px; height: 52px; font: inherit; font-size: 16px; font-weight: 500; letter-spacing: -.02em; color: var(--dark); background: var(--ink); border: 0; border-radius: 14px; box-shadow: 0 8px 24px rgba(0,0,0,.45); cursor: pointer; }
   #sitefull .bar svg { width: 18px; height: 18px; }
   #sitefull iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; background: #141414; }
-  /* câmera livre (só para modelar): aparece com F no localhost ou com ?livre */
+  /* câmera livre (só para modelar): aparece com F no localhost */
   #free { position: fixed; left: 20px; bottom: 16px; font-size: 13px; line-height: 1.5; color: var(--ink-60); pointer-events: none; display: none; }
   body.free #free { display: block; }
   #free b { color: var(--ink); font-weight: 600; } #free code { font: 12px ui-monospace, Consolas, monospace; color: var(--ink); }
@@ -190,7 +190,7 @@ if (/perf/.test(location.search)) (function () {
   // anel de progresso: progress(0..1) enche o anel no centro da tela (a cena chama a cada etapa montada)
   const fg = btn.querySelector('.fg'), still = document.getElementById('vstill');
   v.progress = (p) => { fg.style.strokeDashoffset = (289 * (1 - Math.max(0, Math.min(1, p)))).toFixed(1); };
-  if (/perf|export/.test(location.search)) still.style.display = 'none';   // com ?perf e ?export a cena já nasce acesa: o render escuro não combinaria
+  if (/perf/.test(location.search)) still.style.display = 'none';   // com ?perf a cena já nasce acesa: o render escuro não combinaria
   // posição exata do render: em tela larga a câmera da cena tem campo vertical fixo (de 8:5 em diante) ou que cresce conforme a tela fica mais quadrada (mesma conta de resize() na cena: manter igual). Os renders foram capturados em 21:9 / campo 40° (larga) e 1,103:1 / campo 58° (média);
   // como recortar o centro de uma imagem retilínea equivale a um campo menor, dá para calcular o tamanho que faz o render coincidir com a cena. Fora disso (celular em pé, tela mais larga que 21:9) vale o CSS.
   const rad = Math.PI / 360;
@@ -203,7 +203,7 @@ if (/perf/.test(location.search)) (function () {
   };
   addEventListener('resize', placeStill); placeStill();
   v.progress(0.05);
-  v.done = () => { v.loaded = true; v.progress(1); veil.classList.add('ready'); btn.removeAttribute('aria-disabled'); paint(); if (/perf/.test(location.search) && /bateria/.test(location.search)) { v.started = true; veil.classList.add('off'); } };   // ?perf&bateria: pula a tela de entrada (sem as dicas animadas, para não mexer na medição)
+  v.done = () => { v.loaded = true; v.progress(1); veil.classList.add('ready'); btn.removeAttribute('aria-disabled'); paint(); };
   const start = () => {
     if (!v.loaded || v.started) return;
     if (ask && v.tilt !== 'granted') D.requestPermission().then(got).catch(() => got('denied'));
@@ -795,16 +795,16 @@ window.__veil.progress(0.12);
 // ===================== CONTEÚDO (vem de Profissional/perfil.md) =====================
 const I18N = window.__i18n;
 const PROJECTS = {
-  drone: { title: 'Drone autônomo', meta: ['Design de engenharia', 'Sapienza, Roma'], desc: 'Drone para missões totalmente autônomas na competição C-UASC 2026, na Califórnia: navegar pela arena, localizar alvos e liberar cargas contra o relógio. A modelagem estrutural cobre fuselagem, trens de pouso e sistemas de carga. 1º lugar na Aircraft Design Competition.' },
+  drone: { title: 'Drone autônomo', meta: ['Design de engenharia', 'Sapienza, Roma'], desc: 'Drone para missões totalmente autônomas na competição C-UASC 2026, na Califórnia: navegar pela arena, localizar alvos e liberar cargas contra o relógio. A modelagem estrutural cobre fuselagem, trens de pouso e sistemas de carga. **1º lugar na Aircraft Design Competition.**' },
   bike:  { title: 'Bicicletário Arcus', meta: ['Design de produto', 'Sapienza, Roma'], desc: 'Bicicletário modular semi-vertical para espaços urbanos compactos. Uma calha curva apoia as rodas, e a bicicleta sobe com pouco esforço até travar. Estrutura em chapas de aço cortadas e soldadas.' },
-  robo:  { title: 'Robôs de combate', meta: ['Design de engenharia', 'UERJ, Rio de Janeiro'], desc: 'Robôs de combate de 150 g a 1.360 g, projetados para maior impacto e durabilidade e para serem reconstruídos rapidamente entre as lutas. O trabalho vai da ideia à modelagem e à manufatura. Em 2024, a equipe ficou com 1º, 2º e 3º lugar na categoria de 150 g do CCBB Robotics Challenge.' },
+  robo:  { title: 'Robôs de combate', meta: ['Design de engenharia', 'UERJ, Rio de Janeiro'], desc: 'Robôs de combate de 150 g a 1.360 g, projetados para maior impacto e durabilidade. O trabalho envolve etapas desde a idealização, passando pela modelagem e manufatura até finalmente chegar à pilotagem em competição.' },
   toddy: { title: 'Toddy', meta: ['Design gráfico', 'ESDI / UERJ'], desc: 'Proposta de redesign da embalagem e da comunicação visual do achocolatado Toddy. O desafio foi trazer um ar minimalista sem destoar de um produto já consolidado no Brasil.' },
 };
 // os modelos dos projetos são os do visualizador (projects/*.js), sem alteração
 const PROJECTS_EN = {
-  drone: { title: 'Autonomous drone', meta: ['Engineering design', 'Sapienza, Rome'], desc: 'Drone for fully autonomous missions at the C-UASC 2026 competition, in California: navigating the arena, locating targets and releasing payloads against the clock. The structural modeling covers fuselage, landing gear and payload systems. 1st place in the Aircraft Design Competition.' },
+  drone: { title: 'Autonomous drone', meta: ['Engineering design', 'Sapienza, Rome'], desc: 'Drone for fully autonomous missions at the C-UASC 2026 competition, in California: navigating the arena, locating targets and releasing payloads against the clock. The structural modeling covers fuselage, landing gear and payload systems. **1st place in the Aircraft Design Competition.**' },
   bike:  { title: 'Arcus bike rack', meta: ['Product design', 'Sapienza, Rome'], desc: 'Modular semi-vertical bike rack for compact urban spaces. A curved rail supports the wheels, and the bike goes up with little effort until it locks in place. Structure made of cut and welded steel plates.' },
-  robo:  { title: 'Combat robots', meta: ['Engineering design', 'UERJ, Rio de Janeiro'], desc: 'Combat robots from 150 g to 1,360 g (3 lb), designed for greater impact and durability and to be rebuilt quickly between fights. The work goes from the idea to modeling and manufacturing. In 2024, the team took 1st, 2nd and 3rd place in the 150 g class at the CCBB Robotics Challenge.' },
+  robo:  { title: 'Combat robots', meta: ['Engineering design', 'UERJ, Rio de Janeiro'], desc: 'Combat robots from 150 g to 1,360 g (3 lb), designed for greater impact and durability. The work covers every stage, from the initial idea through modeling and manufacturing, all the way to piloting in competition.' },
   toddy: { title: 'Toddy', meta: ['Graphic design', 'ESDI / UERJ'], desc: 'Redesign proposal for the packaging and visual communication of Toddy chocolate drink. The challenge was to bring a minimalist look without clashing with a product already established in Brazil.' },
 };
 const proj = (id) => (I18N.lang === 'en' ? PROJECTS_EN : PROJECTS)[id];
@@ -816,28 +816,17 @@ await Promise.all([document.fonts.load('600 80px "Funnel Sans"'), document.fonts
 
 // ---------- renderizador e cena ----------
 const canvas = document.getElementById('gl');
-// ajustes de teste (só com ?perf): escala=, aa=0|1, sombra=<n>|0, lampada=0, suave=0, luzes=min. Sem ?perf nada disso é lido
-const QP = PERF ? new URLSearchParams(location.search) : null;
-const Q = { escala: null, aa: true, sombra: null, lampada: true, suave: true, luzesMin: false, ativos: [] };
-if (QP) {
-  const num = (k) => { const v = QP.get(k); if (v === null || v === '') return null; const n = Number(v); return Number.isFinite(n) ? n : null; };
-  const esc = num('escala'); if (esc !== null && esc > 0) { Q.escala = esc; Q.ativos.push('escala=' + esc); }
-  if (QP.get('aa') === '0') { Q.aa = false; Q.ativos.push('aa=0'); } else if (QP.get('aa') === '1') Q.ativos.push('aa=1');
-  const som = num('sombra'); if (som !== null && som >= 0) { Q.sombra = som; Q.ativos.push('sombra=' + som); }
-  if (QP.get('lampada') === '0') { Q.lampada = false; Q.ativos.push('lampada=0'); }
-  if (QP.get('suave') === '0') { Q.suave = false; Q.ativos.push('suave=0'); }
-  if (QP.get('luzes') === 'min') { Q.luzesMin = true; Q.ativos.push('luzes=min'); }
-}
 // qualidade: o aparelho que mediu fps baixo numa visita anterior (coleta em segundo plano, lá no laço) abre sem suavização de bordas, porque essa troca só pode ser feita na abertura. ?qualidade=alta|leve força. Com ?perf só vale o que estiver na URL, para não contaminar os testes
+const Q = { aa: true, ativos: [] };
 const QUAL = (() => { const f = (location.search.match(/qualidade=(alta|leve)/) || [])[1]; if (f || PERF) return f || 'alta'; try { return localStorage.getItem('qualidade') === 'leve' ? 'leve' : 'alta'; } catch (e) { return 'alta'; } })();
-if (QUAL === 'leve' && !(QP && QP.get('aa') === '1')) { Q.aa = false; Q.ativos.push('qualidade=leve'); }
+if (QUAL === 'leve') { Q.aa = false; Q.ativos.push('qualidade=leve'); }
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: Q.aa, alpha: true });
 renderer.setClearColor(0x000000, 0);
-renderer.setPixelRatio(Math.min(devicePixelRatio, Q.escala || 2));
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.1;
-renderer.shadowMap.enabled = Q.sombra !== 0;
-renderer.shadowMap.type = Q.suave ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.shadowMap.autoUpdate = false;   // a cena é quase toda parada: as sombras só são refeitas quando algo que faz sombra se mexe (ver shadowHold, em animate)
 const scene = new THREE.Scene();
 // sem fundo no WebGL: o cinza vem do <body>, e a tela do monitor é um furo por onde se vê a camada CSS3D com o site
@@ -886,30 +875,27 @@ const shelfM = mat(0xffffff, { map: woodTex('#76503a'), roughness: 0.5 });
 // uma luz de destaque (clique) e uma sob a mesa. As luzes azuis e roxas que sobravam tingiam o teclado e os robôs (as de baixo atravessavam o tampo, porque luz sem sombra não é barrada)
 scene.add(new THREE.HemisphereLight(0xbfc3cc, 0x40362e, 0.45));
 const key = new THREE.DirectionalLight(0xfff0e2, 1.5); key.position.set(0.6, 1.9, 2.4); key.target.position.set(0, 0.9, -0.3);
-key.castShadow = true; key.shadow.mapSize.set(Q.sombra || 2048, Q.sombra || 2048); key.shadow.bias = -0.0003; key.shadow.normalBias = 0.006; key.shadow.radius = 5;
+key.castShadow = true; key.shadow.mapSize.set(2048, 2048); key.shadow.bias = -0.0003; key.shadow.normalBias = 0.006; key.shadow.radius = 5;
 Object.assign(key.shadow.camera, { left: -1.3, right: 1.3, top: 1.0, bottom: -0.6, near: 0.5, far: 6 });
 scene.add(key, key.target);
-const lampLight = new THREE.SpotLight(0xffc98a, 5, 2.4, 0.85, 0.8, 1.4); lampLight.castShadow = Q.lampada; lampLight.shadow.mapSize.set(Q.sombra ? Math.max(256, Q.sombra / 2) : 1024, Q.sombra ? Math.max(256, Q.sombra / 2) : 1024); lampLight.shadow.bias = -0.0005; lampLight.shadow.normalBias = 0.004; scene.add(lampLight, lampLight.target);
+const lampLight = new THREE.SpotLight(0xffc98a, 5, 2.4, 0.85, 0.8, 1.4); lampLight.castShadow = true; lampLight.shadow.mapSize.set(1024, 1024); lampLight.shadow.bias = -0.0005; lampLight.shadow.normalBias = 0.004; scene.add(lampLight, lampLight.target);
 const GLOW_I = 1.1;   // força da luz do monitor em repouso
 const glow = new THREE.PointLight(0xc9d6ff, GLOW_I, 1.4, 1.4); glow.position.set(0, 1.05, -0.3); scene.add(glow);   // uma só luz do monitor, no plano da tela: clareia a mesa na frente e faz o halo na parede atrás
 const focusLight = new THREE.PointLight(0xfff2e0, 0, 0.7, 1.5); scene.add(focusLight);
 // ?perf&luzes=min: só a luz geral e o sol; as outras saem da cena (os objetos continuam existindo, então intensity/position seguem funcionando sem efeito)
-if (Q.luzesMin) scene.remove(lampLight, lampLight.target, glow, focusLight);
 
 // =====================================================================
 // AMBIENTE
 // =====================================================================
 const room = group(scene);
-// seções do ambiente (para a exportação ao Blender): cada mark() abre uma seção com os objetos criados depois dele
-const SECTIONS = [], mark = (name) => SECTIONS.push([name, room.children.length]);
-mark('Parede e mesa'); await stepDone('Parede e mesa');
+await stepDone('Parede e mesa');
 add(new THREE.PlaneGeometry(4.2, 2.6), mat(0xffffff, { map: wallTex, roughness: 0.9, envMapIntensity: 0.15 }), room, 0, 1.3, -0.47);
 // mesa de nogueira com borda arredondada
 rbox(2.6, 0.045, 0.8, 0.012, walnutM, room, 0, 0.7175, -0.08, 4);
 // (a frente da mesa agora é aberta, com gaveteiros e PC embaixo: veja a seção "Chão e embaixo da mesa")
 
 // ---------- pegboard metálico com ferramentas ----------
-mark('Pegboard'); await stepDone('Pegboard');
+await stepDone('Pegboard');
 const DROP = 0.02;   // o pegboard e tudo que está preso nele foi abaixado 2 cm (valor negativo = sobe)
 const PB = { w: 0.86, h: 0.48, y: 1.29 - DROP, z: -0.44 };
 rbox(PB.w, PB.h, 0.012, 0.01, mat(C.board, { roughness: 0.6, metalness: 0.3 }), room, 0, PB.y, PB.z);
@@ -974,7 +960,7 @@ driverRack(1.44); [C.toolBlue, C.toolBlue, C.red, C.yellow, C.yellow].forEach((c
 driverRack(1.295); [0, 1, 2, 3, 4].forEach((i) => driver(0.165 + i * 0.035, 1.335, C.dark, C.red));
 
 // ---------- prateleiras de nogueira com mãos-francesas pretas ----------
-mark('Prateleiras'); await stepDone('Prateleiras');
+await stepDone('Prateleiras');
 const shelf = (x, y) => {
   rbox(0.56, 0.024, 0.2, 0.005, shelfM, room, x, y, -0.36, 3);
   [-0.2, 0.2].forEach((dx) => { const b = mat(C.bracket, { metalness: 0.4, roughness: 0.5 });
@@ -1031,15 +1017,14 @@ const screenTex = canvasTex(1600, 1000, (g) => {
 const monitor = hit(group(scene), 'monitor');
 rbox(SCREEN.w + 0.022, SCREEN.h + 0.022, 0.018, 0.006, mat(C.dark, { roughness: 0.35, metalness: 0.2 }), monitor, 0, SCREEN.y, SCREEN.z - 0.009);
 rbox(0.5, 0.3, 0.035, 0.03, mat(C.graphite, { roughness: 0.45 }), monitor, 0, SCREEN.y + 0.01, SCREEN.z - 0.035);
-const screenMatPlaceholder = new THREE.MeshBasicMaterial({ map: screenTex, toneMapped: false });   // usada só na exportação para o Blender
 const screen = add(new THREE.PlaneGeometry(SCREEN.w, SCREEN.h), new THREE.MeshBasicMaterial({ color: 0x000000, opacity: 0, blending: THREE.NoBlending, side: THREE.DoubleSide }), monitor, 0, SCREEN.y, SCREEN.z + 0.0004);
 
 // site do Framer dentro do monitor: um iframe de 1600x1000 px na camada CSS3D, no mesmo lugar e tamanho da tela (escala K: 1 m = 1000 px)
 const SITE_URL = 'https://felipecollucci.framer.website', siteUrl = () => SITE_URL + (I18N.lang === 'pt' ? '/pt/?lang=pt' : '/?lang=en'), SITE_FILL = 0.95, SITE_SCROLL = 2.2;   // o ?lang= faz o site respeitar a escolha daqui (senão o Framer redireciona pelo idioma do navegador); SITE_FILL: fração da janela que o site ocupa quando ampliado
 const K = 1000, cssScene = new THREE.Scene(), cssRenderer = new CSS3DRenderer(), cssCamera = new THREE.PerspectiveCamera(40, 1, 0.02 * K, 50 * K);
 cssRenderer.domElement.id = 'css3d'; document.body.insertBefore(cssRenderer.domElement, canvas);
-// cada projeto da cena tem a própria página no site do Framer; o Toddy ainda não tem (sem página, a ficha não mostra "ver projeto")
-const SITE_SLUG = { drone: 'drone-autonomo', bike: 'arcus', robo: 'combate-robos' };
+// cada projeto da cena tem a própria página no site do Framer (sem página, a ficha não mostra "ver mais")
+const SITE_SLUG = { drone: 'drone-autonomo', bike: 'arcus', robo: 'combate-robos', toddy: 'toddy' };
 let siteTarget = null;   // projeto aberto no monitor (null = página inicial do site)
 const projectUrl = (id) => SITE_URL + (I18N.lang === 'pt' ? '/pt' : '') + '/work/projects/' + SITE_SLUG[id] + '?lang=' + I18N.lang;
 const curUrl = () => (siteTarget && SITE_SLUG[siteTarget] ? projectUrl(siteTarget) : siteUrl());
@@ -1054,17 +1039,44 @@ rbox(0.065, 0.27, 0.02, 0.008, mat(C.graphite, { roughness: 0.4, metalness: 0.4 
   const b = extrude(s, 0.008, mat(C.graphite, { roughness: 0.4, metalness: 0.4 }), monitor, 0.003); b.rotation.x = -Math.PI / 2; b.position.set(0, 0.7425, SCREEN.z - 0.05); })();
 tube([[0.0, 0.8, SCREEN.z - 0.085], [0.03, 0.76, SCREEN.z - 0.12], [0.12, 0.745, -0.43]], 0.004, mat(C.dark, { roughness: 0.6 }), room, 20, 8);
 
-// ---------- mousepad azul com costura ----------
-mark('Mousepad'); await stepDone('Mousepad');
+// ---------- tapete de corte azul (cutting mat): grade de 1 cm, régua nas bordas, ângulos e carimbos, desenhados numa textura sobre a placa ----------
+await stepDone('Mousepad');
 const PAD = { w: 1.06, d: 0.42, x: 0.03, z: 0.06 };
 rbox(PAD.w, 0.004, PAD.d, 0.002, mat(C.blue, { roughness: 0.92, envMapIntensity: 0.1 }), room, PAD.x, 0.742, PAD.z, 2);
-(() => { const s = new THREE.Shape(), w = PAD.w / 2 - 0.006, d = PAD.d / 2 - 0.006, r = 0.012;
-  s.moveTo(-w + r, -d); s.lineTo(w - r, -d); s.quadraticCurveTo(w, -d, w, -d + r); s.lineTo(w, d - r); s.quadraticCurveTo(w, d, w - r, d); s.lineTo(-w + r, d); s.quadraticCurveTo(-w, d, -w, d - r); s.lineTo(-w, -d + r); s.quadraticCurveTo(-w, -d, -w + r, -d);
-  const pts = s.getSpacedPoints(160).map((p) => V(p.x + PAD.x, 0.7445, p.y + PAD.z));
-  add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), 320, 0.0012, 4, true), mat(0x17286f, { roughness: 1 }), room); })();
+(() => {
+  const TW = 2048, TH = Math.round(TW * PAD.d / PAD.w), cm = TW / (PAD.w * 100);   // 1 cm do tapete = ~19 px da textura
+  const tex = canvasTex(TW, TH, (g, w, h) => {
+    g.fillStyle = '#2541a6'; g.fillRect(0, 0, w, h);
+    const m = 2 * cm, nx = Math.round((w - 2 * m) / cm), ny = Math.round((h - 2 * m) / cm), X0 = m, Y0 = m, X1 = m + nx * cm, Y1 = m + ny * cm;
+    const L = (x1, y1, x2, y2, a, lw = 1) => { g.strokeStyle = `rgba(255,255,255,${a})`; g.lineWidth = lw; g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); };
+    const lv = (i) => (i % 10 === 0 ? [0.55, 2] : i % 5 === 0 ? [0.38, 1.4] : [0.2, 1]);   // linha de 1 cm fina, de 5 cm e de 10 cm mais fortes
+    for (let i = 0; i <= nx; i++) { const [a, lw] = lv(i); L(X0 + i * cm, Y0, X0 + i * cm, Y1, a, lw); }
+    for (let j = 0; j <= ny; j++) { const [a, lw] = lv(j); L(X0, Y0 + j * cm, X1, Y0 + j * cm, a, lw); }
+    // ângulos, arcos com graduação, círculo central e marcas triangulares (tudo cortado na área da grade)
+    g.save(); g.beginPath(); g.rect(X0, Y0, X1 - X0, Y1 - Y0); g.clip();
+    [15, 30, 45, 60, 75].forEach((a) => { const r = a * Math.PI / 180; L(X0, Y1, X0 + Math.cos(r) * 3000, Y1 - Math.sin(r) * 3000, 0.25); L(X1, Y0, X1 - Math.cos(r) * 3000, Y0 + Math.sin(r) * 3000, 0.25); });
+    g.strokeStyle = 'rgba(255,255,255,.4)'; g.lineWidth = 1.2; [12, 20, 28].forEach((R) => { g.beginPath(); g.arc(X0, Y1, R * cm, -Math.PI / 2, 0); g.stroke(); });
+    for (let a = 0; a <= 90; a += 5) { const r = a * Math.PI / 180, len = a % 15 ? 6 : 12; L(X0 + Math.cos(r) * 28 * cm, Y1 - Math.sin(r) * 28 * cm, X0 + Math.cos(r) * (28 * cm - len), Y1 - Math.sin(r) * (28 * cm - len), 0.6); }
+    g.setLineDash([6, 6]); g.strokeStyle = 'rgba(255,255,255,.3)'; g.beginPath(); g.arc((X0 + X1) / 2, (Y0 + Y1) / 2, 6 * cm, 0, 7); g.stroke(); g.setLineDash([]);
+    g.fillStyle = 'rgba(255,255,255,.85)'; [[20, 10], [60, 26], [85, 12], [45, 31], [92, 30]].forEach(([cx, cy]) => { const x = X0 + cx * cm, y = Y0 + cy * cm; g.beginPath(); g.moveTo(x - 6, y - 6); g.lineTo(x + 6, y - 6); g.lineTo(x, y + 5); g.closePath(); g.fill(); });
+    g.restore();
+    // borda e régua (tracinhos a cada 0,5 cm, mais longos a cada 1 e a cada 10) com números a cada 10 cm
+    g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = 2.5; g.strokeRect(X0, Y0, X1 - X0, Y1 - Y0);
+    for (let i = 0; i <= nx * 2; i++) { const x = X0 + i * cm / 2, len = i % 20 === 0 ? 18 : i % 2 === 0 ? 11 : 6; L(x, Y0, x, Y0 - len, 0.85); L(x, Y1, x, Y1 + len, 0.85); }
+    for (let j = 0; j <= ny * 2; j++) { const y = Y0 + j * cm / 2, len = j % 20 === 0 ? 18 : j % 2 === 0 ? 11 : 6; L(X0, y, X0 - len, y, 0.85); L(X1, y, X1 + len, y, 0.85); }
+    g.fillStyle = 'rgba(255,255,255,.85)'; g.font = '600 13px sans-serif'; g.textAlign = 'center';
+    for (let i = 0; i <= nx; i += 10) { g.fillText(String(i), X0 + i * cm, Y0 - 22); g.fillText(String(i), X0 + i * cm, Y1 + 32); }
+    for (let j = 0; j <= ny; j += 10) [X0 - 28, X1 + 28].forEach((x) => { g.save(); g.translate(x, Y0 + j * cm); g.rotate(-Math.PI / 2); g.fillText(String(j), 0, 4); g.restore(); });
+    // carimbos de canto
+    g.textAlign = 'left'; g.strokeStyle = 'rgba(255,255,255,.85)'; g.lineWidth = 1.5; g.fillStyle = 'rgba(255,255,255,.9)';
+    g.strokeRect(X1 - 19 * cm, Y1 - 6.5 * cm, 16 * cm, 4.5 * cm); g.font = '700 13px sans-serif'; g.fillText('METRIC · cm', X1 - 19 * cm + 12, Y1 - 6.5 * cm + 28); g.font = '700 24px sans-serif'; g.fillText('106 × 42 cm', X1 - 19 * cm + 12, Y1 - 6.5 * cm + 60);
+  });
+  const top = add(new THREE.PlaneGeometry(PAD.w - 0.002, PAD.d - 0.002), mat(0xffffff, { map: tex, roughness: 0.9, envMapIntensity: 0.1 }), room, PAD.x, 0.7441, PAD.z);
+  top.rotation.x = -Math.PI / 2; top.userData.noShadow = true;
+})();
 
 // ---------- teclado de perfil baixo com layout real ----------
-mark('Teclado'); await stepDone('Teclado');
+await stepDone('Teclado');
 (() => {
   const g = group(room, 0, 0.744, 0.095); g.rotation.x = 0.035;
   const U = 0.0285, gap = 0.0035;
@@ -1089,7 +1101,7 @@ mark('Teclado'); await stepDone('Teclado');
 })();
 
 // ---------- mouse ergonômico sem fio ----------
-mark('Mouse'); await stepDone('Mouse');
+await stepDone('Mouse');
 (() => {
   const g = group(room, 0.29, 0.744, 0.205); g.rotation.y = -0.12;
   const geo = new THREE.SphereGeometry(0.034, 40, 24); const p = geo.attributes.position;
@@ -1101,7 +1113,7 @@ mark('Mouse'); await stepDone('Mouse');
 })();
 
 // ---------- luminária articulada com molas ----------
-mark('Luminária'); await stepDone('Luminária');
+await stepDone('Luminária');
 // base no canto de trás à esquerda; o braço se estende sobre a mesa e a cúpula aponta para a área de trabalho (multímetro e solda)
 (() => {
   const B = V(-0.84, 0.742, -0.22), T = V(-0.46, 0.742, -0.05);              // base e ponto iluminado
@@ -1136,10 +1148,10 @@ mark('Luminária'); await stepDone('Luminária');
   lampLight.intensity = 2.4; lampLight.angle = 0.7;
 })();
 
-// ---------- estação de solda (entre o teclado e o monitor, ao lado dos robôs; o ferro inclina para a esquerda, longe deles) ----------
-mark('Estação de solda'); await stepDone('Estação de solda');
+// ---------- estação de solda (entre o teclado e o monitor, na frente do canto direito da tela; o ferro inclina para a esquerda) ----------
+await stepDone('Estação de solda');
 (() => {
-  const g = group(room, 0.16, 0.742, -0.195); g.rotation.y = Math.PI - 0.2;
+  const g = group(room, 0.25, 0.742, -0.195); g.rotation.y = Math.PI - 0.2;   // x 0,25 (antes 0,16): o ferro e a mola tampam parte do selo "Made in Framer" no canto de baixo da tela, visto da câmera inicial
   const dk = mat(0x232428, { roughness: 0.45, metalness: 0.3 }), st = mat(C.steel, METAL);
   rbox(0.12, 0.016, 0.085, 0.006, dk, g, 0, 0.008, 0);
   rbox(0.045, 0.008, 0.04, 0.003, mat(0x2a2a2e), g, 0.032, 0.02, 0.012); rbox(0.036, 0.008, 0.03, 0.004, mat(C.yellow, { roughness: 0.95 }), g, 0.032, 0.026, 0.012);
@@ -1156,7 +1168,7 @@ mark('Estação de solda'); await stepDone('Estação de solda');
 })();
 
 // ---------- multímetro (capa laranja, visor, seletor, bornes, pontas de prova) ----------
-mark('Multímetro'); await stepDone('Multímetro');
+await stepDone('Multímetro');
 (() => {
   const g = group(room, -0.36, 0.742, -0.2); g.rotation.set(-0.3, 0.22, 0);
   rbox(0.09, 0.165, 0.036, 0.012, mat(0xdc7420, { roughness: 0.7 }), g, 0, 0.0825, 0);
@@ -1164,11 +1176,11 @@ mark('Multímetro'); await stepDone('Multímetro');
   // modo continuidade com as pontas encostadas: resistência quase zero e o símbolo do bipe
   const lcd = canvasTex(256, 128, (c) => { c.fillStyle = '#b9c7b4'; c.fillRect(0, 0, 256, 128); c.fillStyle = '#202820'; c.font = '600 84px monospace'; c.textAlign = 'right'; c.fillText('0.3', 198, 100);
     c.font = '600 40px sans-serif'; c.fillText('Ω', 244, 100); c.font = '700 34px monospace'; c.textAlign = 'left'; c.fillText('·)))', 12, 42); c.font = '600 18px monospace'; c.fillText('CONT', 14, 118); c.fillText('BEEP', 200, 30); });
-  add(new THREE.PlaneGeometry(0.056, 0.028), mat(0xffffff, { map: lcd, roughness: 0.3 }), g, 0, 0.13, 0.0204);
+  add(new THREE.PlaneGeometry(0.056, 0.028), mat(0xffffff, { map: lcd, roughness: 0.3, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), g, 0, 0.13, 0.0204);   // polygonOffset: o visor fica a 0,4 mm da capa e brigava na profundidade (z-fighting) com a câmera mais longe
   // símbolos em volta do seletor; o ponteiro (40°) aponta a continuidade
   const dialTex = canvasTex(256, 256, (c) => { c.clearRect(0, 0, 256, 256); c.textAlign = 'center'; c.textBaseline = 'middle';
     [['OFF', 245, 20], ['A', 200, 24], ['V', 150, 24], ['V~', 108, 22], ['Ω', 72, 26], ['·)))', 40, 24], ['▷|', 8, 22]].forEach(([t, deg, fs]) => { const a = (deg * Math.PI) / 180; c.fillStyle = deg === 40 ? '#fff6c8' : '#cfd2d8'; c.font = '700 ' + fs + 'px sans-serif'; c.fillText(t, 128 + Math.cos(a) * 106, 128 - Math.sin(a) * 106); }); });
-  add(new THREE.PlaneGeometry(0.075, 0.075), new THREE.MeshBasicMaterial({ map: dialTex, transparent: true, toneMapped: false }), g, 0, 0.078, 0.0203);
+  add(new THREE.PlaneGeometry(0.075, 0.075), new THREE.MeshBasicMaterial({ map: dialTex, transparent: true, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }), g, 0, 0.078, 0.0203);
   const dial = group(g, 0, 0.078, 0.021); dial.rotation.x = Math.PI / 2;
   cyl(0.022, 0.022, 0.006, mat(0x1f2024, { roughness: 0.4 }), dial, 0, 0.002, 0, 40);
   rbox(0.036, 0.006, 0.008, 0.002, mat(0x2b2c31), dial, 0, 0.007, 0).rotation.y = 0.7;
@@ -1194,7 +1206,7 @@ mark('Multímetro'); await stepDone('Multímetro');
 })();
 
 // ---------- fone over-ear deitado ----------
-mark('Fone'); await stepDone('Fone');
+await stepDone('Fone');
 (() => {
   // dobrado e deitado, como fones de conchas giratórias: as conchas viradas para baixo e o arco deitado na mesa, atrás delas.
   // cada garfo abraça a metade de trás da concha (pinos nas laterais) e o arco sai do meio do garfo, para trás
@@ -1223,7 +1235,7 @@ mark('Fone'); await stepDone('Fone');
 })();
 
 // ---------- caneca de cerâmica ----------
-mark('Caneca'); await stepDone('Caneca');
+await stepDone('Caneca');
 (() => {
   const g = group(room, -0.7, 0.742, -0.19); g.rotation.y = 0.35;   // ao lado da base da luminária
   const cm = mat(C.cream, { roughness: 0.3 });
@@ -1233,7 +1245,7 @@ mark('Caneca'); await stepDone('Caneca');
 })();
 
 // ---------- paquímetro digital ----------
-mark('Paquímetro'); await stepDone('Paquímetro');
+await stepDone('Paquímetro');
 (() => {
   // deitado no mousepad entre o mouse e o caderno, bicos externos para trás (sem passar da borda), medindo 12,70 mm
   const g = group(room, 0.428, 0.744, 0.247); g.rotation.y = 0.02;
@@ -1264,7 +1276,7 @@ mark('Paquímetro'); await stepDone('Paquímetro');
 })();
 
 // ---------- impressora 3D (como a da imagem D): base, mesa móvel, pórtico de duas colunas, cabeçote e carretéis em cima ----------
-mark('Impressora 3D'); await stepDone('Impressora 3D');
+await stepDone('Impressora 3D');
 // tudo encaixado: as colunas nascem de sapatas na base, a viga X corre em carros nas colunas, os carretéis giram num eixo sobre a travessa
 (() => {
   const g = group(room, 0.7, 0.742, -0.16);
@@ -1346,7 +1358,7 @@ const hand = (g, text, x, y, size, col = '#26282e') => { g.font = `700 ${size}px
 const toLocal = (g, x, y, z) => g.worldToLocal(V(x, y, z)).toArray();
 
 // ---------- papéis: esquema elétrico, desenho técnico, código de cores, pinagem, lista, rascunho, post-its ----------
-mark('Papéis e post-its'); await stepDone('Papéis e post-its');
+await stepDone('Papéis e post-its');
 const schematicTex = (title) => canvasTex(512, 680, (g, w, h) => {
   g.fillStyle = PAPER; g.fillRect(0, 0, w, h); lineGrid(g, w, h, 16, 'rgba(44,62,102,.09)');
   g.strokeStyle = INK; g.fillStyle = INK; g.lineWidth = 2.5; g.strokeRect(16, 16, w - 32, h - 32);
@@ -1381,20 +1393,76 @@ const schematicTex = (title) => canvasTex(512, 680, (g, w, h) => {
   g.strokeRect(w - 230, h - 110, 214, 94); line(w - 230, h - 70, w - 16, h - 70);
   g.font = '600 19px monospace'; g.fillText(title, w - 220, h - 80); g.font = '500 15px monospace'; g.fillText('REV B · FOLHA 1/2', w - 220, h - 46); g.fillText('ESC 1:1', w - 220, h - 26);
 });
+// ligação de um receptor de rádio FS2A (4 canais, 2.4 GHz, saída PWM) aos ESCs e motores: só blocos e rótulos de rede, sem valores de tensão
+const rxTex = (title) => canvasTex(512, 680, (g, w, h) => {
+  g.fillStyle = PAPER; g.fillRect(0, 0, w, h); lineGrid(g, w, h, 16, 'rgba(44,62,102,.09)');
+  g.strokeStyle = INK; g.fillStyle = INK; g.lineWidth = 2.5; g.strokeRect(16, 16, w - 32, h - 32);
+  const line = (...p) => { g.beginPath(); g.moveTo(p[0], p[1]); for (let i = 2; i < p.length; i += 2) g.lineTo(p[i], p[i + 1]); g.stroke(); };
+  const term = (x, y) => { g.fillStyle = PAPER; g.beginPath(); g.arc(x, y, 5, 0, 7); g.fill(); g.stroke(); g.fillStyle = INK; };
+  const gnd = (x, y) => { line(x, y, x, y + 14); line(x - 14, y + 14, x + 14, y + 14); line(x - 9, y + 20, x + 9, y + 20); line(x - 4, y + 26, x + 4, y + 26); };
+  const box = (x, y, bw, bh) => { g.fillStyle = PAPER; g.fillRect(x, y, bw, bh); g.strokeRect(x, y, bw, bh); g.fillStyle = INK; };
+  g.font = '600 15px monospace';
+  // antena e receptor
+  line(115, 96, 115, 52); line(115, 52, 101, 30); line(115, 52, 129, 30); g.fillText('ANT', 136, 62);
+  box(40, 96, 150, 330);
+  g.font = '700 30px monospace'; g.fillText('RX', 52, 170); g.font = '700 26px monospace'; g.fillText('FS2A', 52, 204); g.font = '600 15px monospace'; g.fillText('2.4 GHz', 52, 228);
+  g.beginPath(); g.arc(66, 290, 9, 0, 7); g.stroke(); g.fillText('BIND', 84, 295);
+  // canais 1 a 3: ESC e motor (alimentação por rótulo de rede); canal 4 livre
+  [140, 230, 320, 400].forEach((y, i) => {
+    term(190, y); g.fillText('CH' + (i + 1), 138, y + 5);
+    if (i < 3) {
+      line(195, y, 256, y); box(256, y - 20, 84, 40); g.fillText('ESC ' + (i + 1), 266, y + 5);
+      line(340, y, 392, y); g.beginPath(); g.arc(414, y, 22, 0, 7); g.stroke(); g.font = '700 18px monospace'; g.fillText('M' + (i + 1), 402, y + 6); g.font = '600 15px monospace';
+      line(298, y - 20, 298, y - 32); g.fillText('+BAT', 304, y - 28);
+      line(298, y + 20, 298, y + 32); g.fillText('GND', 304, y + 37);
+    } else { line(195, y, 300, y); term(306, y); g.fillText('livre', 322, y + 5); }
+  });
+  // alimentação do receptor: bateria, BEC
+  term(62, 426); g.fillText('VCC', 50, 416); line(62, 431, 62, 452); g.fillText('VCC', 70, 462);
+  term(112, 426); g.fillText('GND', 100, 416); line(112, 431, 112, 444); gnd(112, 444);
+  box(190, 500, 100, 50); g.fillText('BEC', 220, 530); line(290, 525, 340, 525); g.fillText('VCC', 346, 530);
+  term(70, 536); g.fillText('+BAT', 82, 528); line(75, 536, 190, 536); line(70, 541, 70, 560);
+  [[560, 32], [572, 16], [584, 32], [596, 16]].forEach(([y, L]) => line(70 - L / 2, y, 70 + L / 2, y));
+  line(70, 596, 70, 612); gnd(70, 612); g.fillText('LiPo', 96, 584);
+  // carimbo
+  g.strokeRect(w - 230, h - 110, 214, 94); line(w - 230, h - 70, w - 16, h - 70);
+  g.font = '600 19px monospace'; g.fillText(title, w - 220, h - 80); g.font = '500 15px monospace'; g.fillText('DES.: F. COLLUCCI', w - 220, h - 46); g.fillText('FOLHA 1/1', w - 220, h - 26);
+});
+// folha de cotas da peça, a partir da imagem de referência do Felipe: contorno medido em polar (um raio por grau, em décimos de mm). Só levam número as cotas do croqui dele: Ø85, Ø65, R15, R7, R5 e 23
+const PART_R = [322,322,322,322,322,322,322,322,322,322,322,322,322,322,322,322,322,322,322,322,322,322,323,324,324,324,325,326,327,328,329,330,330,331,333,334,335,337,339,342,344,345,346,348,350,353,356,358,361,363,365,368,371,374,378,382,386,390,393,396,399,403,406,409,413,415,417,418,420,421,422,422,423,424,425,424,424,424,357,349,342,337,333,330,328,326,325,325,325,325,325,325,325,325,325,325,325,325,325,325,326,326,326,325,325,325,325,325,325,326,326,326,326,326,326,326,326,326,327,327,327,327,327,327,327,327,327,327,327,327,327,327,327,327,327,327,327,327,327,328,329,328,327,327,327,327,327,327,327,327,327,327,327,327,327,328,328,328,328,327,327,327,327,327,327,327,327,327,327,328,327,327,328,328,328,327,327,328,328,328,328,328,328,328,327,327,328,328,328,327,327,328,328,328,328,329,330,332,334,337,341,346,351,355,359,364,369,373,377,382,385,388,390,392,394,394,395,395,396,396,394,392,352,345,337,331,327,324,321,320,319,320,319,317,317,317,318,319,321,322,324,327,331,335,338,342,346,351,355,360,364,368,373,377,380,383,386,388,389,391,393,394,393,392,392,392,391,349,341,334,329,325,322,320,318,316,315,314,314,314,315,315,316,318,321,323,325,328,332,336,339,343,347,352,357,361,366,371,376,379,383,385,388,389,391,391,392,391,391,391,389,343,337,332,328,326,324,324,323,322,322,323,323,323,322,322,322,322,322,322,322,322,322,322,322,322,322,322,322,322,322,322,322,322,322,322,322,322,322,322,322,322,322,322,322,322,322,322,322,322];
 const blueprintTex = canvasTex(520, 660, (g, w, h) => {
-  g.fillStyle = '#1c2f52'; g.fillRect(0, 0, w, h); lineGrid(g, w, h, 20, 'rgba(200,215,240,.08)');
-  g.strokeStyle = g.fillStyle = 'rgba(225,232,245,.85)'; g.lineWidth = 2; g.strokeRect(14, 14, w - 28, h - 28);
-  const cx = 200, cy = 250, R = 115, n = 18; g.beginPath();   // engrenagem
-  for (let i = 0; i < n * 2; i++) g.arc(cx, cy, i % 2 ? R : R + 18, (i / (n * 2)) * Math.PI * 2, ((i + 1) / (n * 2)) * Math.PI * 2);
-  g.closePath(); g.stroke();
-  [48, 20].forEach((r) => { g.beginPath(); g.arc(cx, cy, r, 0, 7); g.stroke(); });
-  for (let i = 0; i < 6; i++) { const a = (i / 6) * Math.PI * 2; g.beginPath(); g.arc(cx + Math.cos(a) * 80, cy + Math.sin(a) * 80, 13, 0, 7); g.stroke(); }
-  g.setLineDash([10, 6, 2, 6]); g.beginPath(); g.moveTo(cx - 165, cy); g.lineTo(cx + 165, cy); g.moveTo(cx, cy - 165); g.lineTo(cx, cy + 165); g.stroke(); g.setLineDash([]);
-  g.beginPath(); g.moveTo(cx - 133, 430); g.lineTo(cx + 133, 430); g.moveTo(cx - 133, 420); g.lineTo(cx - 133, 440); g.moveTo(cx + 133, 420); g.lineTo(cx + 133, 440); g.stroke();
-  g.font = '500 20px monospace'; g.textAlign = 'center'; g.fillText('Ø 266', cx, 420);
-  g.strokeRect(400, 135, 60, 230); [180, 250, 320].forEach((y) => { g.setLineDash([6, 5]); g.beginPath(); g.moveTo(400, y); g.lineTo(460, y); g.stroke(); g.setLineDash([]); });
-  g.fillText('12', 430, 395); g.textAlign = 'left';
-  g.strokeRect(w - 250, h - 110, 236, 96); g.font = '600 20px monospace'; g.fillText('ENGRENAGEM Z18', w - 238, h - 76); g.font = '500 15px monospace'; g.fillText('PETG · 1:1 · REV C', w - 238, h - 46);
+  const LN = 'rgba(240,244,252,.97)', FAINT = 'rgba(235,240,252,.55)', D = Math.PI / 180, k = 3.4, cx = 232, cy = 262;
+  const P = (x, y) => [cx + x * k, cy - y * k];
+  const at = (deg, r = PART_R[deg] / 10) => [r * Math.cos(deg * D), r * Math.sin(deg * D)];
+  g.fillStyle = '#2b4b88'; g.fillRect(0, 0, w, h); lineGrid(g, w, h, 20, 'rgba(210,222,245,.14)');
+  g.strokeStyle = g.fillStyle = LN; g.lineWidth = 2; g.strokeRect(14, 14, w - 28, h - 28);
+  const arrow = (x, y, a) => { g.beginPath(); g.moveTo(x, y); g.lineTo(x - 11 * Math.cos(a - 0.3), y - 11 * Math.sin(a - 0.3)); g.lineTo(x - 11 * Math.cos(a + 0.3), y - 11 * Math.sin(a + 0.3)); g.closePath(); g.fill(); };
+  const dim = (a, b) => { const [x1, y1] = P(...a), [x2, y2] = P(...b), t = Math.atan2(y2 - y1, x2 - x1); g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.stroke(); arrow(x1, y1, t + Math.PI); arrow(x2, y2, t); };
+  const leader = (from, knee, end) => { const [x1, y1] = P(...from), [x2, y2] = P(...knee), [x3, y3] = P(...end); g.beginPath(); g.moveTo(x1, y1); g.lineTo(x2, y2); g.lineTo(x3, y3); g.stroke(); arrow(x1, y1, Math.atan2(y1 - y2, x1 - x2)); };
+  const lab = (txt, mx, my, deg, dy = 0) => { const [x, y] = P(mx, my); g.save(); g.translate(x, y); g.rotate(-deg * D); g.textAlign = 'center'; g.fillText(txt, 0, dy); g.restore(); };
+  g.font = '500 17px monospace';
+  // construção: círculos Ø85 e Ø65 e eixos
+  g.setLineDash([8, 6]); g.strokeStyle = FAINT; g.lineWidth = 1.5;
+  [42.5, 32.5].forEach((R) => { g.beginPath(); g.arc(cx, cy, R * k, 0, 7); g.stroke(); });
+  g.setLineDash([12, 5, 2, 5]); g.beginPath(); g.moveTo(cx - 52 * k, cy); g.lineTo(cx + 52 * k, cy); g.moveTo(cx, cy - 52 * k); g.lineTo(cx, cy + 52 * k); g.stroke(); g.setLineDash([]);
+  // contorno da peça
+  g.strokeStyle = LN; g.lineWidth = 2.6; g.beginPath();
+  PART_R.forEach((r, a) => { const [x, y] = P(...at(a, r / 10)); a ? g.lineTo(x, y) : g.moveTo(x, y); });
+  g.closePath(); g.fillStyle = 'rgba(225,232,245,.07)'; g.fill(); g.stroke(); g.fillStyle = LN; g.lineWidth = 2;
+  // bolso hexagonal (lados retos em cima e embaixo, cantos arredondados), furo central com rebaixo e três furos nos lados alternados
+  const hv = [0, 1, 2, 3, 4, 5].map((i) => P(26.56 * Math.cos(i * Math.PI / 3), 26.56 * Math.sin(i * Math.PI / 3))), mid = (a, b) => [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+  g.beginPath(); g.moveTo(...mid(hv[5], hv[0])); hv.forEach((v, i) => g.arcTo(v[0], v[1], ...mid(v, hv[(i + 1) % 6]), 8.8 * k)); g.closePath(); g.stroke();
+  [5.8, 11].forEach((R) => { g.beginPath(); g.arc(cx, cy, R * k, 0, 7); g.stroke(); });
+  [30, 150, 270].forEach((deg) => { const [x, y] = P(...at(deg, 23.8)); g.beginPath(); g.arc(x, y, 1.5 * k, 0, 7); g.stroke(); });
+  // cotas do croqui
+  dim(at(76.5, 42.5), at(256.5, 42.5)); lab('Ø85', 7.2, 30, 76.5, -5);
+  dim([-32.3, -3.7], [32.3, 3.7]); lab('Ø65', -19, -2.5, 6.5, -6);
+  dim([0, 0], [0, 23]); lab('23', 0, 17, 90, -6);
+  leader(at(66), [24, 47], [33, 47]); g.textAlign = 'left'; g.fillText('R15', ...P(34.5, 45.8));
+  leader(at(82), [-6, 47], [-14, 47]); g.textAlign = 'right'; g.fillText('R7', ...P(-15.5, 45.8));
+  leader(at(312), [38, -41], [46, -41]); g.textAlign = 'left'; g.fillText('R5', ...P(47.5, -42.2));
+  // carimbo (sem nome de peça, escala nem material)
+  g.textAlign = 'left'; g.strokeRect(w - 250, h - 110, 236, 96); g.font = '600 20px monospace'; g.fillText('PEÇA 01', w - 238, h - 76); g.font = '500 15px monospace'; g.fillText('COTAS EM mm', w - 238, h - 52); g.fillText('DES.: F. COLLUCCI', w - 238, h - 30);
 });
 const resistorTex = canvasTex(400, 500, (g, w, h) => {
   g.fillStyle = PAPER; g.fillRect(0, 0, w, h);
@@ -1407,17 +1475,34 @@ const resistorTex = canvasTex(400, 500, (g, w, h) => {
   cols.forEach(([n, c], i) => { const y = 145 + i * 34; g.fillStyle = c; g.fillRect(24, y, 60, 26); g.strokeStyle = 'rgba(0,0,0,.3)'; g.strokeRect(24, y, 60, 26);
     g.fillStyle = '#26282e'; g.fillText(n, 100, y + 20); g.fillText(String(i), 240, y + 20); g.fillText(mult[i], 290, y + 20); });
 });
+// pinagem do ESP32 NodeMCU-32S, simplificada e em proporção real: placa de 25,4 × 48,3 mm (10 × 19 passos de 2,54 mm) com 19 pinos de cada lado, fileiras a 9 passos (22,86 mm), módulo ESP-WROOM-32 (18 × 25,5 mm) com a antena em cima, chip USB, botões EN e IO0 e micro USB embaixo. Pinos na ordem da referência do Felipe
 const pinoutTex = canvasTex(512, 340, (g, w, h) => {
   g.fillStyle = '#e9e3d6'; g.fillRect(0, 0, w, h);
-  g.fillStyle = '#26282e'; g.font = '700 24px "Funnel Sans"'; g.fillText('PINAGEM · UNO', 18, 32);
-  g.fillStyle = '#1d6578'; g.beginPath(); g.roundRect(96, 76, 330, 200, 14); g.fill();
-  g.fillStyle = '#16181c'; g.fillRect(150, 86, 250, 14); g.fillRect(210, 252, 190, 14); g.fillRect(240, 160, 130, 34);
-  g.fillStyle = '#c9ccd2'; g.fillRect(80, 110, 56, 50); g.fillStyle = '#16181c'; g.fillRect(84, 200, 50, 40);
-  g.font = '600 13px monospace';
-  for (let i = 0; i < 14; i++) { g.save(); g.translate(392 - i * 17.5, 72); g.rotate(-Math.PI / 2); g.fillStyle = i < 2 ? '#b8452f' : [3, 5, 6, 9, 10, 11].includes(i) ? '#2f57c2' : '#26282e'; g.fillText((i === 0 ? '' : '') + 'D' + i, 0, 4); g.restore(); }
-  for (let i = 0; i < 6; i++) { g.save(); g.translate(300 + i * 18, 280); g.rotate(-Math.PI / 2); g.fillStyle = '#3c8a5a'; g.fillText('A' + i, -30, 4); g.restore(); }
-  ['5V', 'GND', '3V3'].forEach((t, i) => { g.fillStyle = i === 1 ? '#26282e' : '#b8452f'; g.fillText(t, 212 + i * 30, 300); });
-  hand(g, '~ = PWM', 400, 320, 26, '#2f57c2');
+  const P = 15, bw = 10 * P, bh = 19 * P, bx = (w - bw) / 2, by = 28;
+  const COL = { pw: '#b8452f', gnd: '#26282e', io: '#1d6578', ser: '#c2307f', bus: '#5b3f8a', en: '#d49a2a' };
+  const L = [[['3V3', 'pw']], [['EN', 'en']], [['IO36', 'io']], [['IO39', 'io']], [['IO34', 'io']], [['IO35', 'io']], [['IO32', 'io']], [['IO33', 'io']], [['IO25', 'io']], [['IO26', 'io']], [['IO27', 'io']],
+    [['IO14', 'io'], ['CLK', 'bus']], [['IO12', 'io'], ['MISO', 'bus']], [['GND', 'gnd']], [['IO13', 'io'], ['MOSI', 'bus']], [['IO9', 'io'], ['RX1', 'ser']], [['IO10', 'io'], ['TX1', 'ser']], [['IO11', 'io']], [['VIN', 'pw']]];
+  const R = [[['GND', 'gnd']], [['IO23', 'io'], ['MOSI', 'bus']], [['IO22', 'io'], ['SCL', 'bus']], [['TX0', 'ser'], ['IO1', 'io']], [['RX0', 'ser'], ['IO3', 'io']], [['IO21', 'io'], ['SDA', 'bus']], [['GND', 'gnd']],
+    [['IO19', 'io'], ['MISO', 'bus']], [['IO18', 'io'], ['SCK', 'bus']], [['IO5', 'io'], ['SS', 'bus']], [['IO17', 'io'], ['TX2', 'ser']], [['IO16', 'io'], ['RX2', 'ser']], [['IO4', 'io']], [['IO0', 'io']], [['IO2', 'io']],
+    [['IO15', 'io'], ['SS', 'bus']], [['IO8', 'io']], [['IO7', 'io']], [['IO6', 'io']]];
+  g.fillStyle = '#26282e'; g.font = '700 15px "Funnel Sans"'; g.textAlign = 'left'; g.fillText('PINAGEM · ESP32', 10, 18);
+  // placa
+  g.fillStyle = '#1b1d22'; g.beginPath(); g.roundRect(bx, by, bw, bh, 5); g.fill();
+  const mw = 106, mx = bx + (bw - mw) / 2;
+  g.fillStyle = '#2c2e35'; g.fillRect(mx, by, mw, 150);                                                   // módulo: placa preta com antena em cima e blindagem de aço
+  g.strokeStyle = '#d4a93a'; g.lineWidth = 2; g.beginPath(); g.moveTo(mx + 8, by + 30); for (let i = 0; i < 5; i++) { const yy = by + 30 - i * 6; g.lineTo(i % 2 ? mx + 8 : mx + mw - 8, yy); g.lineTo(i % 2 ? mx + 8 : mx + mw - 8, yy - 3); } g.stroke();
+  g.fillStyle = '#b9bcc2'; g.fillRect(mx + 3, by + 38, mw - 6, 109); g.fillStyle = '#26282e'; g.font = '700 9px monospace'; g.textAlign = 'center'; g.fillText('ESP-WROOM-32', w / 2, by + 96); g.textAlign = 'left';
+  g.fillStyle = '#3a3d45'; g.fillRect(w / 2 - 15, by + 205, 30, 30);                                         // chip USB-serial (CP2102)
+  g.fillStyle = '#c9ccd2'; [bx + 22, bx + bw - 42].forEach((x) => g.fillRect(x, by + bh - 46, 20, 20));      // botões EN e IO0
+  g.fillRect(w / 2 - 22, by + bh - 26, 44, 32);                                                              // micro USB, sobrando 1,5 mm da borda
+  // pinos e rótulos
+  const side = (rows, px, dir) => rows.forEach((chips, i) => {
+    const y = by + P / 2 + i * P; g.fillStyle = '#d4a93a'; g.beginPath(); g.arc(px, y, 3.4, 0, 7); g.fill();
+    g.strokeStyle = 'rgba(38,40,46,.5)'; g.lineWidth = 1; g.beginPath(); g.moveTo(px + dir * 4, y); g.lineTo(px + dir * 18, y); g.stroke();
+    let cx = px + dir * 20; g.font = '700 9px monospace';
+    chips.forEach(([t, c]) => { const cw = g.measureText(t).width + 7, left = dir < 0 ? cx - cw : cx; g.fillStyle = COL[c]; g.beginPath(); g.roundRect(left, y - 5.5, cw, 11, 3); g.fill(); g.fillStyle = '#f4f2ec'; g.fillText(t, left + 3.5, y + 3.2); cx += dir * (cw + 3); });
+  });
+  side(L, bx + P / 2, -1); side(R, bx + bw - P / 2, 1);
 });
 const listTex = (lines) => canvasTex(256, 320, (g, w, h) => {
   g.fillStyle = '#ece6d6'; g.fillRect(0, 0, w, h);
@@ -1425,16 +1510,17 @@ const listTex = (lines) => canvasTex(256, 320, (g, w, h) => {
   g.strokeStyle = '#e08a8a'; g.beginPath(); g.moveTo(30, 0); g.lineTo(30, h); g.stroke();
   lines.forEach((t, i) => hand(g, t, 38, 50 + i * 34, 30));
 });
-const sketchTex = canvasTex(400, 560, (g, w, h) => {
-  g.fillStyle = '#ece6d6'; g.fillRect(0, 0, w, h);
-  g.fillStyle = 'rgba(44,62,102,.25)'; for (let x = 20; x < w; x += 20) for (let y = 20; y < h; y += 20) g.fillRect(x, y, 2, 2);
-  hand(g, 'suporte v3', 30, 60, 46); g.strokeStyle = '#4a4c53'; g.lineWidth = 3;
-  g.strokeRect(70, 120, 260, 150); [[120, 195], [280, 195]].forEach(([x, y]) => { g.beginPath(); g.arc(x, y, 22, 0, 7); g.stroke(); });
-  g.beginPath(); g.moveTo(70, 300); g.lineTo(330, 300); g.stroke(); hand(g, '60 mm', 165, 332, 30, '#4a4c53');
-  g.beginPath(); g.moveTo(70, 390); g.lineTo(330, 390); g.lineTo(330, 430); g.lineTo(120, 430); g.lineTo(70, 480); g.closePath(); g.stroke();
-  hand(g, 'chanfro 2mm?', 160, 520, 32, '#b8452f');
+const sketchTex = canvasTex(400, 560, (g, w, h) => { g.fillStyle = '#f4f3ef'; g.fillRect(0, 0, w, h); });   // folha em branco
+// post-it: cada linha é texto ou { t, s (tamanho), y (linha de base), strike }; o texto encolhe até caber na largura; band = false deixa o papel liso
+const noteTex = (lines, bg = '#d9c46a', band = true) => canvasTex(160, 160, (g, w, h) => {
+  g.fillStyle = bg; g.fillRect(0, 0, w, h); if (band) { g.fillStyle = 'rgba(0,0,0,.07)'; g.fillRect(0, 0, w, 24); }
+  lines.forEach((l, i) => {
+    const o = typeof l === 'string' ? { t: l } : l; let size = o.s || 38; g.font = `700 ${size}px "Caveat"`;
+    while (g.measureText(o.t).width > w - 26 && size > 12) { size -= 1; g.font = `700 ${size}px "Caveat"`; }
+    const y = o.y || 64 + i * 40; hand(g, o.t, 14, y, size);
+    if (o.strike) { const tw = g.measureText(o.t).width; g.strokeStyle = '#26282e'; g.lineWidth = 2.5; g.beginPath(); g.moveTo(10, y - size * 0.3); g.lineTo(18 + tw, y - size * 0.3); g.stroke(); }
+  });
 });
-const noteTex = (lines, bg = '#d9c46a') => canvasTex(160, 160, (g, w, h) => { g.fillStyle = bg; g.fillRect(0, 0, w, h); g.fillStyle = 'rgba(0,0,0,.07)'; g.fillRect(0, 0, w, 24); lines.forEach((t, i) => hand(g, t, 14, 64 + i * 40, 38)); });
 // folha presa por um alfinete (parede, pegboard ou moldura do monitor)
 const pinned = (x, y, z, w, h, tex, rz = 0, pin = C.red) => {
   const s = add(new THREE.PlaneGeometry(w, h), paperM(tex), room, x, y, z); s.rotation.z = rz;
@@ -1444,18 +1530,18 @@ const pinned = (x, y, z, w, h, tex, rz = 0, pin = C.red) => {
 const deskSheet = (x, z, w, d, tex, yaw, y = 0.7403) => { const s = add(new THREE.PlaneGeometry(w, d), paperM(tex), room, x, y, z); s.rotation.set(-Math.PI / 2, 0, yaw); return s; };
 
 // parede: desenho técnico atrás da luminária, código de cores entre as prateleiras, esquema atrás do drone, lista ao lado do pegboard
-pinned(-0.74, 0.93, -0.4685, 0.2, 0.254, blueprintTex, -0.03, C.yellow);
+pinned(-0.9, 0.93, -0.4685, 0.2, 0.254, blueprintTex, -0.03, C.yellow);   // só subiu (de y 0,88 para 0,93): o topo fica logo abaixo da prateleira (1,068) e a caneca deixa de cobrir o desenho
 pinned(-0.78, 1.205, -0.4685, 0.112, 0.14, resistorTex, 0.04);
-pinned(-0.97, 1.47, -0.4685, 0.15, 0.2, schematicTex('SCH-01 · PONTE H'), 0.05, C.toolBlue);
+pinned(-0.97, 1.47, -0.4685, 0.15, 0.2, rxTex('RX FS2A · LIGAÇÃO'), 0.05, C.toolBlue);
 pinned(-0.505, 1.2, -0.4685, 0.075, 0.094, listTex(['comprar:', '- M3x8', '- 608ZZ', '- bateria 4S', '- termo']), -0.06);
 // post-its na moldura do monitor e no pegboard
-pinned(-0.336, 0.808, -0.2985, 0.05, 0.05, noteTex(['calibrar', 'a mesa!']), 0.12, null);
-pinned(0.35, 0.86, -0.2985, 0.05, 0.05, noteTex(['PID', 'kp 1.2'], '#d99a8e'), -0.1, null);
-pinned(-0.045, 1.305 - DROP, PB.z + 0.009, 0.045, 0.045, noteTex(['ESC', 'v2 ok'], '#9fb4d8'), 0.08, null);
+pinned(-0.336, 0.808, -0.2985, 0.05, 0.05, noteTex([], '#d9c46a', false), 0.12, null);
+pinned(0.35, 0.86, -0.2985, 0.05, 0.05, noteTex(['lubrificar', 'impressora!'], '#d99a8e'), -0.1, null);
+pinned(-0.045, 1.305 - DROP, PB.z + 0.009, 0.045, 0.045, noteTex(['esc v2:', { t: 'em desenvolvimento', s: 26, y: 92, strike: true }, { t: 'pronto!', s: 46, y: 142 }], '#9fb4d8'), 0.08, null);
 pinned(0.035, 1.372 - DROP, PB.z + 0.009, 0.12, 0.08, pinoutTex, -0.02, C.yellow).position.x += 0;
 
 // ---------- pegboard: mais ferramentas penduradas ----------
-mark('Pegboard (extras)'); await stepDone('Pegboard (extras)');
+await stepDone('Pegboard (extras)');
 const tapeRoll = (parent, color, R = 0.025, r = 0.016, w = 0.019) => lathe([[r, -w / 2], [R, -w / 2], [R, w / 2], [r, w / 2], [r, -w / 2]], mat(color, { roughness: 0.45 }), parent, 0, 0, 0, 36);
 const solderSpool = (parent, R = 0.022) => { const g = group(parent);
   const wire = canvasTex(64, 128, (c, w, h) => { c.fillStyle = '#a6a9ae'; c.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 3) { c.fillStyle = 'rgba(0,0,0,.22)'; c.fillRect(0, y, w, 1); } });
@@ -1502,7 +1588,7 @@ const ps1 = solderSpool(tools); ps1.position.set(0.05, 1.4922, 0.018); ps1.rotat
 })();
 
 // ---------- prateleiras: potes de peças, caixas ----------
-mark('Prateleiras (potes e caixas)'); await stepDone('Prateleiras (potes e caixas)');
+await stepDone('Prateleiras (potes e caixas)');
 // caixas e componentes de eletrônica (no lugar dos potes), na prateleira de cima à esquerda
 (() => {
   const Y = 1.312, dk = mat(0x2b2f38, { roughness: 0.5 });
@@ -1569,7 +1655,7 @@ mark('Prateleiras (potes e caixas)'); await stepDone('Prateleiras (potes e caixa
 })();
 
 // ---------- bancada: esquema e plaquinha na terceira mão (na luz da luminária); protoboard e Arduino na frente do teclado ----------
-mark('Bancada eletrônica'); await stepDone('Bancada eletrônica');
+await stepDone('Bancada eletrônica');
 deskSheet(-0.56, -0.17, 0.148, 0.21, schematicTex('SCH-02 · SENSOR'), 0.15);
 const PCB = group(room, -0.585, 0.8, -0.225); PCB.rotation.set(0.35, 0.1, 0);
 (() => { // plaquinha de circuito presa nas garras da terceira mão
@@ -1637,7 +1723,7 @@ const PCB = group(room, -0.585, 0.8, -0.225); PCB.rotation.set(0.35, 0.1, 0);
 })();
 
 // ---------- terceira mão com lupa ----------
-mark('Terceira mão'); await stepDone('Terceira mão');
+await stepDone('Terceira mão');
 // base pesada com dois braços flexíveis (pescoço de ganso) que seguram a placa pelas bordas, e a lupa numa haste atrás
 (() => {
   const g = group(room, -0.6, 0.742, -0.33); g.rotation.y = 0.1;
@@ -1682,7 +1768,7 @@ mark('Terceira mão'); await stepDone('Terceira mão');
 })();
 
 // ---------- gaveteiro de componentes ----------
-mark('Gaveteiro'); await stepDone('Gaveteiro');
+await stepDone('Gaveteiro');
 (() => {
   const g = group(room, -0.48, 0.742, -0.395); g.rotation.y = 0.12;
   const W = 0.13, H = 0.16, D = 0.1;
@@ -1703,7 +1789,7 @@ mark('Gaveteiro'); await stepDone('Gaveteiro');
 })();
 
 // ---------- fonte de bancada com osciloscópio em cima ----------
-mark('Fonte e osciloscópio'); await stepDone('Fonte e osciloscópio');
+await stepDone('Fonte e osciloscópio');
 (() => {
   const ps = group(room, 0.47, 0.742, -0.37); ps.rotation.y = -0.3;
   const body = mat(0x3a3c42, { roughness: 0.45, metalness: 0.3 }), dk = mat(0x1d1e22, { roughness: 0.4 });
@@ -1748,7 +1834,7 @@ mark('Fonte e osciloscópio'); await stepDone('Fonte e osciloscópio');
 })();
 
 // ---------- bagunça na mesa ----------
-mark('Bagunça na mesa'); await stepDone('Bagunça na mesa');
+await stepDone('Bagunça na mesa');
 (() => { // chave de fenda solta na frente do monitor
   const g = group(room, -0.13, 0.744, -0.12); g.rotation.y = 0.25;
   const h = group(g, 0, 0.0076, 0); h.rotation.z = Math.PI / 2;
@@ -1832,7 +1918,7 @@ pinned(0.52, 1.38, -0.4685, 0.07, 0.09, canvasTex(224, 288, (c, w, h) => {   // 
 // LEDs do PC gamer: cada item é [material ou luz, deslocamento de cor]; rgbTick() gira a cor com o tempo
 const rgbLeds = [], rgbLights = [];
 const rgbTick = (t) => { const hu = (t * 0.00007) % 1; rgbLeds.forEach(([m, o]) => m.color.setHSL((hu + o) % 1, 1, 0.55 * rgbPower)); rgbLights.forEach(([l, o]) => l.color.setHSL((hu + o) % 1, 1, 0.55 * rgbPower)); };   // rgbPower: 0 sem energia, 1 ligado (entrada)
-mark('Chão e embaixo da mesa'); await stepDone('Chão e embaixo da mesa');
+await stepDone('Chão e embaixo da mesa');
 (() => {
   const dk = mat(C.walnutDark, { roughness: 0.7 }), body = mat(0x2b2c31, { roughness: 0.55, metalness: 0.15 }), front = mat(0x3a3d45, { roughness: 0.5, metalness: 0.1 }), st = mat(C.steel, METAL);
   // chão de tábuas escuras, da parede até bem à frente da mesa
@@ -1904,10 +1990,10 @@ mark('Chão e embaixo da mesa'); await stepDone('Chão e embaixo da mesa');
   tube([[0.34, 0.02, -0.43], [0.4, 0.01, -0.3], [0.44, 0.03, -0.153]], 0.005, mat(0x16181c, { roughness: 0.6 }), room, 20, 6);
   // fita de LED sob a borda da mesa e uma luz fraca azulada, para o vão não ficar um buraco escuro
   add(new THREE.BoxGeometry(1.2, 0.006, 0.012), new THREE.MeshBasicMaterial({ color: 0x9fb8ff, toneMapped: false }), room, 0, 0.691, 0.29);
-  const under = new THREE.SpotLight(0x9fb4ff, 1.6, 1.6, 1.25, 1, 1.4); under.position.set(0, 0.69, 0.2); under.target.position.set(0, 0, 0.25); if (!Q.luzesMin) scene.add(under, under.target);   // foco apontado para o chão: ilumina o vão sem subir para os objetos em cima da mesa
+  const under = new THREE.SpotLight(0x9fb4ff, 1.6, 1.6, 1.25, 1, 1.4); under.position.set(0, 0.69, 0.2); under.target.position.set(0, 0, 0.25); scene.add(under, under.target);   // foco apontado para o chão: ilumina o vão sem subir para os objetos em cima da mesa
 })();
 
-mark('Parede (decoração)'); await stepDone('Parede (decoração)');
+await stepDone('Parede (decoração)');
 (() => {
   const WZ = -0.4685;
 
@@ -2004,12 +2090,12 @@ P.toddy.anchor = V(0.06, TODDY_HELD.y + 0.085, 0);
 // sombras em tudo (menos a tela)
 scene.traverse((o) => { if (o.isMesh && !o.userData.hitbox) { o.castShadow = o !== screen && !o.userData.noShadow; o.receiveShadow = true; } });
 
-// ---------- otimizações da cena montada (no ?export nada disso roda, para o Blender receber a cena como sempre) ----------
-if (!/export/.test(location.search)) {
+// ---------- otimizações da cena montada ----------
+{
   // 1) materiais idênticos viram uma única instância (menos trocas de estado e de programa na GPU; o visual não muda)
   // fora: os projetos clicáveis e o monitor (pulseMats mexe no emissive deles), os LEDs RGB (cor muda a cada quadro) e a tela; um material que também apareça nesses grupos fica de fora
   const skipRoots = new Set([monitor, ...Object.values(P).map((m) => m.holder)]);
-  const protectedMats = new Set([screen.material, screenMatPlaceholder, ...rgbLeds.map(([m]) => m)]);
+  const protectedMats = new Set([screen.material, ...rgbLeds.map(([m]) => m)]);
   const matsOf = (o) => (Array.isArray(o.material) ? o.material : [o.material]);
   skipRoots.forEach((r) => r.traverse((o) => { if (o.material) matsOf(o).forEach((m) => protectedMats.add(m)); }));
   const DEDUP_TYPES = new Set(['MeshStandardMaterial', 'MeshPhysicalMaterial', 'MeshBasicMaterial', 'MeshLambertMaterial', 'MeshPhongMaterial']);
@@ -2047,7 +2133,7 @@ if (!/export/.test(location.search)) {
 
   // 1b) acabamentos quase iguais viram um só: a cor passa para um atributo da malha (cor por vértice) e rugosidade, metal e reflexo do ambiente são arredondados para poucos degraus,
   // então a fusão abaixo junta muito mais peças. Só materiais opacos, sem imagem nem brilho próprio, dentro de room; ficam de fora os LEDs RGB, a tela, os visores e a lâmpada (emissivos ou sem iluminação,
-  // que a energia liga um a um) e os projetos (que têm o próprio passo, 2b). A conta da cor não muda: o material fica branco e a cor da malha é a cor linear que o material tinha. ?semcor desliga.
+  // que a energia liga um a um) e os projetos (que têm o próprio passo, 2b). A conta da cor não muda: o material fica branco e a cor da malha é a cor linear que o material tinha.
   const qB = (v, cuts, vals) => { for (let i = 0; i < cuts.length; i++) if (v <= cuts[i]) return vals[i]; return vals[vals.length - 1]; };
   const MAPS = ['map', 'alphaMap', 'aoMap', 'bumpMap', 'displacementMap', 'emissiveMap', 'envMap', 'lightMap', 'metalnessMap', 'normalMap', 'roughnessMap', 'clearcoatMap', 'sheenColorMap', 'transmissionMap'];
   // família do material: mesmas propriedades, exceto cor, rugosidade, metal e reflexo, que entram arredondados (rugosidade 0,30/0,45/0,70/0,92; metal 0,02/0,30/0,60/0,90; reflexo 0,10/0,35/0,90)
@@ -2071,9 +2157,9 @@ if (!/export/.test(location.search)) {
     o.geometry = ng; o.material = c; return true;
   };
   // 1a) imagens pequenas e ilegíveis (etiquetas, lombadas, faixas, réguas, rótulo da bateria; o gaveteiro de componentes, os 3 post-its, a lista de compras, a pinagem do Arduino e o painel de LEDs ficaram com imagem a pedido do Felipe) viram uma cor lisa: a média da imagem. Identificadas por tamanho da imagem em pixels e posição em cm (o Felipe escolheu em 17/11/2026).
-  // Ficam com imagem: chão, tapete, parede, mesa, prateleira, instrumentos com visor, bancada de ferramentas, papéis e quadros da parede. ?semcor desliga.
+  // Ficam com imagem: chão, tapete, parede, mesa, prateleira, instrumentos com visor, bancada de ferramentas, papéis e quadros da parede.
   const SMALL_IMG = new Set(['64x128@5,147,-41', '32x512@-39,136,-43', '128x48@39,138,-39', '128x48@39,128,-39', '64x256@93,137,-36', '64x256@98,137,-36', '64x256@103,137,-36', '1360x64@43,75,25', '128x48@81,110,-18', '64x256@63,117,-20', '64x256@68,117,-20', '64x256@73,117,-20', '64x256@78,117,-20', '160x64@-97,137,-34', '64x44@-89,132,-36', '160x52@-79,111,-31', '64x128@-27,76,-12', '256x96@-39,77,13', '200x68@-93,12,30', '200x68@-93,33,30', '200x68@-93,54,30', '200x68@93,16,30', '200x68@93,48,30']);
-  if (!/semcor/.test(location.search)) {
+  {
     const smallMaps = new Set(), avg = new Map(), bb = new THREE.Box3(), cc = new THREE.Vector3();
     room.updateMatrixWorld(true);
     room.traverse((o) => {
@@ -2098,7 +2184,7 @@ if (!/export/.test(location.search)) {
     console.info('imagens pequenas viraram cor: ' + smallMaps.size + ' imagens, ' + nf + ' malhas');
   }
 
-  if (!/semcor/.test(location.search)) {
+  {
     const fam = new Map(); let fm = 0;
     room.traverse((o) => { if (vcApply(o, fam, protectedMats)) fm++; });
     console.info('cor por vértice (sala): ' + fm + ' malhas, ' + fam.size + ' materiais');
@@ -2157,7 +2243,7 @@ if (!/export/.test(location.search)) {
   // 2b) modelos dos projetos: dentro de cada projeto, materiais idênticos viram um só e as partes que não animam com o mesmo material viram uma malha só (menos draw calls).
   // Quais partes animam é medido de verdade: roda a animação por um ciclo (ou ~3 s) e anota todo nó que muda de posição, giro ou escala; esses nós e tudo o que está dentro deles ficam como estão.
   // O dedupe é por projeto (o brilho de chamar atenção mexe no emissive do material: dois projetos não podem dividir material). Os materiais continuam sendo os mesmos objetos, só passam a ser menos.
-  if (!/semfusao/.test(location.search)) for (const id in P) {
+  for (const id in P) {
     const m = P[id], root = m.built.root, nodes = []; root.traverse((o) => nodes.push(o));
     const snap = nodes.map((o) => [o.position.clone(), o.quaternion.clone(), o.scale.clone()]), moved = new Set();
     const N = m.cycle ? 44 : 24, sdt = m.cycle ? m.cycle / 44 : 0.137;
@@ -2172,7 +2258,7 @@ if (!/export/.test(location.search)) {
     const free = (o) => { for (let a = o; a; a = a.parent) { if (moved.has(a) || !a.visible) return false; if (a === root) return true; } return false; };
     const share = new Map(); let mats0 = new Set(), mats1 = new Set();
     nodes.forEach((o) => { if (!o.isMesh || Array.isArray(o.material)) return; mats0.add(o.material); const k = matKey(o.material); if (!k) { mats1.add(o.material); return; } const f = share.get(k); if (f) o.material = f; else { share.set(k, o.material); mats1.add(o.material); } });
-    if (!/semcor/.test(location.search)) { const fam = new Map(); nodes.forEach((o) => { if (o.isMesh) { const before = o.material; if (vcApply(o, fam, null, true)) { mats1.delete(before); mats1.add(o.material); } } }); mats1 = new Set([...mats1].filter((mt) => nodes.some((o) => o.material === mt))); }   // cor por vértice dentro do projeto (a família é só deste projeto, então o brilho de atenção continua agindo no objeto inteiro)
+    { const fam = new Map(); nodes.forEach((o) => { if (o.isMesh) { const before = o.material; if (vcApply(o, fam, null, true)) { mats1.delete(before); mats1.add(o.material); } } }); mats1 = new Set([...mats1].filter((mt) => nodes.some((o) => o.material === mt))); }   // cor por vértice dentro do projeto (a família é só deste projeto, então o brilho de atenção continua agindo no objeto inteiro)
     const groups = new Map();
     nodes.forEach((o) => {
       if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || !free(o)) return;
@@ -2243,7 +2329,7 @@ const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 // ---------- estado e interação ----------
 const state = { mode: 'desk', focus: null, hover: null };
-if (/debug/.test(location.search)) window.__d = { get frame() { return frame; }, renderer, camera, cam, HOME, P, scene, lampLight, V, state, THREE, SECTIONS, room, openFocus: (id) => openFocus(P[id].holder), openScreen };
+if (/debug/.test(location.search)) window.__d = { get frame() { return frame; }, renderer, camera, cam, HOME, P, scene, lampLight, V, state, THREE, room, openFocus: (id) => openFocus(P[id].holder), openScreen };
 const ray = new THREE.Raycaster();
 const overScreen = (e) => {
   ray.setFromCamera(new THREE.Vector2((e.clientX / W) * 2 - 1, -(e.clientY / H) * 2 + 1), camera);
@@ -2328,10 +2414,10 @@ function showTag(g) {
   const p = proj(g.userData.id);
   tag.querySelector('.meta').textContent = p.meta.join(' · ');
   tag.querySelector('.t').textContent = p.title;
-  tag.querySelector('.desc').textContent = p.desc;
+  tag.querySelector('.desc').replaceChildren(...p.desc.split('**').map((t, i) => { if (i % 2 === 0) return document.createTextNode(t); const b = document.createElement('b'); b.textContent = t; return b; }));   // **texto** na descrição vira negrito
   const dr = FOCUS[g.userData.id].drag; tag.querySelector('.drag').textContent = dr === 'none' ? '' : I18N.t(dr === 'orbit' ? 'orbit' : 'spin');
   tag.querySelector('.go').textContent = I18N.t('view');
-  tag.querySelector('.go').hidden = !SITE_SLUG[g.userData.id];   // projeto sem página no site (Toddy): sem "ver projeto"
+  tag.querySelector('.go').hidden = !SITE_SLUG[g.userData.id];   // projeto sem página no site: sem "ver mais"
   tag.querySelector('.next').textContent = I18N.t('next') + ' →';
   tag.classList.add('show');
 }
@@ -2429,7 +2515,7 @@ addEventListener('keydown', (e) => { if (e.key !== 'Escape') return; if (state.m
 
 // ---------- câmera livre, com os controles do Fusion 360 (ferramenta de modelagem, não aparece para visitantes) ----------
 // botão do meio move, Shift + botão do meio gira em volta do ponto sob o cursor, rodinha aproxima em direção ao cursor
-const FREE_OK = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname) || /livre/.test(location.search);
+const FREE_OK = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
 const freeXYZ = document.querySelector('#free .xyz');
 const solid = [];
 scene.traverse((o) => { if (o.isMesh && !o.userData.hitbox && o.material && o.material.visible !== false) solid.push(o); });
@@ -2580,77 +2666,105 @@ function animate(dt, t) {
   if (shadowHold > 0) { shadowHold--; if (!moving || shadowFrames <= 120 || (shadowFrames & 1)) renderer.shadowMap.needsUpdate = true; }
 }
 
-// ---------- exportação para o Blender (?export): a cena em .glb, organizada por seção ----------
-// a página fica parada depois disso (os objetos mudam de pai); o .glb fica em window.__glb
-async function exportGLB() {
-  const { GLTFExporter } = await import('three/addons/exporters/GLTFExporter.js');
-  const { mergeGeometries } = await import('three/addons/utils/BufferGeometryUtils.js');
-  screen.material = screenMatPlaceholder;   // no Blender a tela leva a imagem provisória (o iframe não exporta)
-  scene.updateMatrixWorld(true);
-  const out = new THREE.Scene(); out.name = 'Escritorio';
-  const folder = (name, parent = out) => { const g = new THREE.Group(); g.name = name; parent.add(g); return g; };
-  const env = folder('Ambiente'), kids = room.children.slice();
-  SECTIONS.forEach(([name, i], k) => { const g = folder(name, env); kids.slice(i, k + 1 < SECTIONS.length ? SECTIONS[k + 1][1] : kids.length).forEach((o, j) => { o.name = o.name || name + ' ' + (j + 1); g.add(o); }); });
-  monitor.name = 'Monitor'; env.add(monitor);
-  const proj = folder('Projetos');
-  for (const id in P) { const h = P[id].holder; h.name = PROJECTS[id].title; h.children.filter((o) => o.userData.hitbox).forEach((o) => h.remove(o)); proj.add(h); }
-  // instâncias (furos do pegboard, teclas) viram uma malha só
-  const inst = []; out.traverse((o) => o.isInstancedMesh && inst.push(o));
-  inst.forEach((o) => { const m = new THREE.Matrix4(), parts = [];
-    for (let i = 0; i < o.count; i++) { o.getMatrixAt(i, m); parts.push(o.geometry.clone().applyMatrix4(m)); }
-    const mesh = new THREE.Mesh(mergeGeometries(parts), o.material); mesh.name = o.name || 'instancias'; mesh.position.copy(o.position); mesh.quaternion.copy(o.quaternion); mesh.scale.copy(o.scale);
-    o.parent.add(mesh); o.parent.remove(o); });
-  // luzes: o alvo vira filho em (0,0,-1), como o glTF pede
-  const lights = folder('Luzes');
-  const aimLight = (src, name, target) => { const l = src.clone(); l.name = name; l.position.copy(src.position);
-    if (target) { l.quaternion.setFromRotationMatrix(new THREE.Matrix4().lookAt(src.position, target, V(0, 1, 0))); l.target = new THREE.Object3D(); l.add(l.target); l.target.position.set(0, 0, -1); }
-    lights.add(l); };
-  aimLight(key, 'Sol (principal)', key.target.position); aimLight(lampLight, 'Luminaria', lampLight.target.position);
-  aimLight(glow, 'Luz do monitor');
-  const cam = new THREE.PerspectiveCamera(40, 16 / 9, 0.02, 50); cam.name = 'Camera'; cam.position.copy(HOME.pos); cam.lookAt(HOME.look); out.add(cam);
-  out.updateMatrixWorld(true);
-  const buf = await new GLTFExporter().parseAsync(out, { binary: true, onlyVisible: true });
-  window.__glb = new Uint8Array(buf);
-  let meshes = 0; out.traverse((o) => o.isMesh && meshes++);
-  return (window.__glbInfo = { bytes: buf.byteLength, meshes });
-}
 
 // ---------- laço ----------
 const clock = new THREE.Clock();
 let first = true;
 // ---------- modo de teste de desempenho (?perf): painel no canto com fps, tempo de cada quadro, desenhos por quadro e dados do aparelho. Só liga com ?perf no endereço; fora disso não existe e não custa nada ----------
 const FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfKcIdjqxYpsDhVtjcAHuGQSMdYJ9gm6xrKcdMslLjFlr3lHw/formResponse', FORM_ENTRY = 'entry.516893404';   // formulário do Felipe ligado a uma planilha: recebe os relatórios do ?perf e a coleta em segundo plano
-// ---------- coleta em segundo plano (site em beta): sem painel e sem atrasar nada, mede os quadros por ~15 s com a aba visível e envia UMA linha anônima por navegador (fps, tela, placa de vídeo). Se a mediana do quadro passar de 25 ms (abaixo de 40 fps), guarda 'qualidade=leve' para a PRÓXIMA visita abrir sem suavização. Não roda com ?perf, em localhost nem em arquivo local (?coleta força, para testar) ----------
-const tele = !PERF && !/export|debug|livre/.test(location.search) && ((location.protocol !== 'file:' && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) || /coleta/.test(location.search)) ? (() => {
-  try { if (localStorage.getItem('coleta') === '1' && !/coleta/.test(location.search)) return null; } catch (e) { return null; }
-  const dts = []; let last = 0, t0 = 0, skip = 20, sent = false, ready = 0;
-  const q = (a, p) => { const b = a.slice().sort((x, y) => x - y); return b[Math.min(b.length - 1, Math.floor(b.length * p))]; };
-  return {
-    ready() { ready = performance.now(); },
-    tick(t) {
-      if (sent) return;
-      if (document.visibilityState !== 'visible' || !document.hasFocus()) { last = 0; return; }   // só conta com a página visível e em foco: janela escondida ou em segundo plano roda devagar e daria fps baixo falso
-      if (last) { const d = t - last; if (d < 250) { if (skip > 0) skip--; else { dts.push(d); if (dts.length > 600) dts.shift(); } } }
-      last = t; if (!t0) t0 = t;
-      if (dts.length < 300 || t - t0 < 15000) return;
-      sent = true;
-      const fps = 1000 / (dts.reduce((a, b) => a + b, 0) / dts.length), i = renderer.info.render, gl = renderer.getContext(), ext = gl.getExtension('WEBGL_debug_renderer_info');
-      try { localStorage.setItem('coleta', '1'); if (q(dts, 0.5) > 25) localStorage.setItem('qualidade', 'leve'); } catch (e) {}
-      const txt = [
-        'COLETA v1  fps ' + fps.toFixed(1) + '   (' + dts.length + ' quadros)',
-        'quadro: mediana ' + q(dts, 0.5).toFixed(1) + ' ms · pior 5% ' + q(dts, 0.95).toFixed(1) + ' ms',
-        'engasgos (>33 ms): ' + dts.filter((d) => d > 33).length + ' de ' + dts.length,
-        'desenhos por quadro: ' + i.calls + ' · triângulos: ' + Math.round(i.triangles / 1000) + ' mil',
-        'tela: ' + innerWidth + '×' + innerHeight + ' · escala ' + renderer.getPixelRatio() + ' → ' + canvas.width + '×' + canvas.height + ' px',
-        'pronto em: ' + (ready / 1000).toFixed(1) + ' s',
-        'GPU: ' + (ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : 'não informado'),
-        'aparelho: ' + (MOBILE ? 'celular' : 'computador') + ' · qualidade: ' + QUAL + ' · modo: ' + state.mode,
-      ].join('\n');
-      window.__coleta = txt;
-      fetch(FORM_URL, { method: 'POST', mode: 'no-cors', body: new URLSearchParams({ [FORM_ENTRY]: txt }) }).catch(() => {});
+// ---------- coleta em segundo plano (site em beta): sem painel e sem atrasar nada. Roda só no site publicado (não em localhost, arquivo local, ?perf nem ?debug) e envia UMA linha anônima por navegador (e uma segunda, na revisita, se o navegador passou a abrir em qualidade leve, para ver se ajudou). ----------
+// O que mede, em fases (as três primeiras acontecem ATRÁS da tela de entrada, que cobre a cena com o render parado, então a pessoa não vê nada):
+//   normal  = a cena do jeito que vai ser desenhada: tempo entre quadros, trabalho do JS por quadro e, onde o navegador permite, tempo da placa de vídeo;
+//   base    = ~30 quadros SEM desenhar a cena: é o ritmo do próprio aparelho (60 Hz, 120 Hz ou 30 Hz do modo economia de bateria), para não culpar a cena por um limite do aparelho;
+//   meia    = ~60 quadros com metade da resolução: se o tempo cai, o limite é a placa de vídeo (pixels); se não cai, é o processador ou o limite do aparelho;
+//   ligar   = os 3 s depois de ligar a energia (voo da câmera, luzes subindo): picos e maior pausa;
+//   mesa    = 120 quadros com a cena acesa, câmera parada.
+// Se a pessoa liga a energia antes de as fases escondidas acabarem, elas são interrompidas (a linha diz "interrompido"). Se não liga em 40 s, envia o que tem.
+// Se a mediana da fase "normal" passa de 25 ms (LIMITE_LEVE, abaixo de 40 quadros/s) e a base mostra que o aparelho aguenta mais, o navegador guarda qualidade=leve para a próxima visita. BUILD marca a versão do site em toda linha.
+const BUILD = '2026-11-17';
+const tele = (() => {
+  if (PERF || /debug/.test(location.search) || location.protocol === 'file:' || /^(localhost|127\.0\.0\.1)$/.test(location.hostname)) return null;
+  let visita = 1, revisita = false;
+  try {
+    visita = (parseInt(localStorage.getItem('visitas'), 10) || 0) + 1; localStorage.setItem('visitas', String(visita));
+    const feito = localStorage.getItem('coleta') === '1', feito2 = localStorage.getItem('coleta2') === '1';
+    if (feito && !(QUAL === 'leve' && !feito2)) return null;
+    revisita = feito;
+  } catch (e) { return null; }
+  const gl = renderer.getContext(), gx = gl.getExtension('EXT_disjoint_timer_query_webgl2'), dbg = gl.getExtension('WEBGL_debug_renderer_info');
+  const LIMITE_LEVE = 25, SKIP = 20, N_NORMAL = 90, N_BASE = 30, N_MEIA = 60, N_MESA = 120, MS_LIGAR = 3000, MS_ESPERA = 40000;
+  const R = {}, pend = []; let fase = 'espera', pulos = 0, ult = 0, pronto = 0, tLigou = 0, qAtual = null, enviado = false, parcial = '', pr0 = renderer.getPixelRatio(), meiaOn = false;
+  const fq = (n) => R[n] || (R[n] = { dts: [], cpu: [], gpu: [], max: 0 });
+  const q = (a, p) => { if (!a.length) return null; const b = a.slice().sort((x, y) => x - y); return b[Math.min(b.length - 1, Math.floor(b.length * p))]; };
+  const f1 = (v) => (v == null ? '-' : v.toFixed(1));
+  const fim = (m) => { if (meiaOn) { renderer.setPixelRatio(pr0); meiaOn = false; } T.pause = false; if (m) parcial += (parcial ? ' · ' : '') + m; };
+  const linha = (n) => { const r = R[n]; if (!r || !r.dts.length) return n + ': sem dados'; return n + ': ' + r.dts.length + ' quadros · mediana ' + f1(q(r.dts, 0.5)) + ' ms · pior 5% ' + f1(q(r.dts, 0.95)) + ' ms · maior pausa ' + f1(r.max) + ' ms · >33 ms: ' + r.dts.filter((d) => d > 33).length + (r.cpu.length ? ' · JS ' + f1(q(r.cpu, 0.5)) + ' ms' : '') + (r.gpu.length ? ' · GPU ' + f1(q(r.gpu, 0.5)) + ' ms (' + r.gpu.length + ')' : ''); };
+  const enviar = (motivo, beacon) => {
+    if (enviado || !R.normal || R.normal.dts.length < 20) return;
+    enviado = true; fim();
+    const nm = q(R.normal.dts, 0.5), bm = R.base && R.base.dts.length >= 10 ? q(R.base.dts, 0.5) : null, mm = R.meia && R.meia.dts.length >= 20 ? q(R.meia.dts, 0.5) : null, gm = R.normal.gpu.length >= 10 ? q(R.normal.gpu, 0.5) : null, cm = q(R.normal.cpu, 0.5);
+    let leitura = 'indefinida';
+    if (bm != null && bm > 28) leitura = 'aparelho limitado a ~' + Math.round(1000 / bm) + ' quadros/s (modo economia ou tela lenta), não é a cena';
+    else if (nm <= 20) leitura = 'ok (60 quadros/s)';
+    else if (mm != null && mm < nm * 0.75) leitura = 'limite da placa de vídeo (pixels): metade da resolução ajuda';
+    else if (gm != null && gm > nm * 0.7) leitura = 'limite da placa de vídeo (tempo de GPU)';
+    else if (cm != null && cm > nm * 0.6) leitura = 'limite do processador (JS por quadro)';
+    else leitura = 'lento sem causa clara' + (bm == null ? ' (sem base)' : '');
+    const leve = nm > LIMITE_LEVE && (bm == null || bm < 22);   // quadro acima de 25 ms (abaixo de 40 quadros/s, escolha do Felipe); a base impede marcar um aparelho preso em 30 Hz, onde o quadro de ~33 ms não é culpa da cena
+    try { localStorage.setItem(revisita ? 'coleta2' : 'coleta', '1'); if (leve) localStorage.setItem('qualidade', 'leve'); else if (bm != null && bm > 28) localStorage.removeItem('qualidade'); } catch (e) {}   // aparelho preso em 30 Hz não é culpa da cena: se tinha ficado marcado como leve, volta para alta
+    const i = renderer.info.render, nav = navigator, navE = performance.getEntriesByType('navigation')[0], rs = performance.getEntriesByType('resource');
+    const mb = ((navE ? navE.transferSize : 0) + rs.reduce((a, e) => a + (e.transferSize || 0), 0)) / 1048576, cn = nav.connection || {};
+    const ua = (nav.userAgent.match(/\(([^)]*)\)/) || [0, '?'])[1].slice(0, 50) + ' | ' + ((nav.userAgent.match(/(Firefox|Edg|OPR|Chrome|Version)\/[\d.]+/) || [''])[0]);
+    const txt = [
+      'COLETA v2 · build ' + BUILD + ' · visita ' + visita + (revisita ? ' (revisita em modo leve)' : '') + ' · ' + (MOBILE ? 'celular' : 'computador') + ' · fps ' + f1(1000 / (R.normal.dts.reduce((a, b) => a + b, 0) / R.normal.dts.length)),
+      'leitura: ' + leitura + ' · qualidade: ' + QUAL + (leve ? ' → guardou leve para a próxima visita' : ''),
+      'fases: ' + (parcial || 'completas') + ' · motivo do envio: ' + motivo,
+      linha('normal'), linha('base'), linha('meia'), linha('ligar'), linha('mesa'),
+      'cena: ' + i.calls + ' desenhos · ' + Math.round(i.triangles / 1000) + ' mil triângulos',
+      'tela: ' + innerWidth + '×' + innerHeight + ' · escala ' + pr0 + ' → ' + canvas.width + '×' + canvas.height + ' px · dpr ' + devicePixelRatio,
+      'carregamento: pronto em ' + (pronto / 1000).toFixed(1) + ' s · página ' + (navE ? (navE.responseEnd / 1000).toFixed(1) : '-') + ' s · rede ' + mb.toFixed(2) + ' MB em ' + (rs.length + 1) + ' arquivos',
+      'GPU: ' + (dbg ? gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL) : 'não informado') + ' · timer de GPU: ' + (gx ? 'sim' : 'não'),
+      'aparelho: ' + (nav.hardwareConcurrency || '-') + ' núcleos · ' + (nav.deviceMemory ? '≥' + nav.deviceMemory + ' GB' : 'memória -') + ' · toque ' + (nav.maxTouchPoints || 0) + ' · rede ' + (cn.effectiveType || '-') + (cn.saveData ? ' (economia de dados)' : '') + ' · ' + ua,
+    ].join('\n');
+    window.__coleta = txt;
+    const corpo = new URLSearchParams({ [FORM_ENTRY]: txt });
+    if (beacon && navigator.sendBeacon) { try { navigator.sendBeacon(FORM_URL, corpo); return; } catch (e) {} }
+    fetch(FORM_URL, { method: 'POST', mode: 'no-cors', body: corpo }).catch(() => {});
+  };
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'hidden' && !enviado && R.normal && R.normal.dts.length >= 60) { parcial += (parcial ? ' · ' : '') + 'saiu antes de terminar'; enviar('aba escondida', true); } });
+  const T = {
+    pause: false,
+    ready() { pronto = performance.now(); fase = 'normal'; pulos = SKIP; },
+    // tempo da placa de vídeo (só em Chrome e parecidos): uma consulta por quadro, lida alguns quadros depois
+    beginGpu() { if (!gx || enviado || fase === 'base' || fase === 'espera' || pend.length > 6 || qAtual) return; qAtual = gl.createQuery(); gl.beginQuery(gx.TIME_ELAPSED_EXT, qAtual); },
+    endGpu() { if (!qAtual) return; gl.endQuery(gx.TIME_ELAPSED_EXT); pend.push([qAtual, fase]); qAtual = null; },
+    tick(t, cpu) {
+      if (enviado) return;
+      for (let k = pend.length - 1; k >= 0; k--) { const [qq, ph] = pend[k]; if (gl.getQueryParameter(qq, gl.QUERY_RESULT_AVAILABLE)) { if (!gl.getParameter(gx.GPU_DISJOINT_EXT)) fq(ph).gpu.push(gl.getQueryParameter(qq, gl.QUERY_RESULT) / 1e6); gl.deleteQuery(qq); pend.splice(k, 1); } }
+      if (document.visibilityState !== 'visible' || !document.hasFocus()) { ult = 0; return; }   // só conta com a página visível e em foco: aba escondida ou em segundo plano roda devagar e daria fps baixo falso
+      const d = ult ? t - ult : 0; ult = t;
+      const ligou = window.__veil.started;
+      if (ligou && !tLigou) {   // ligou a energia: as fases escondidas acabam aqui
+        if (fase === 'normal' || fase === 'base' || fase === 'meia') fim('interrompido ao ligar (' + fase + ')');
+        tLigou = t; fase = 'ligar'; pulos = 0; return;
+      }
+      if (fase === 'espera') return;
+      if (fase === 'normal' || fase === 'base' || fase === 'meia' || fase === 'mesa' || fase === 'ligar') {
+        if (!d) return;
+        if (pulos > 0) { pulos--; return; }
+        const r = fq(fase); if (d > r.max) r.max = d;
+        if (d < 250) { r.dts.push(d); if (cpu != null && fase !== 'base') r.cpu.push(cpu); }
+      }
+      if (fase === 'normal' && R.normal.dts.length >= N_NORMAL) { T.pause = true; fase = 'base'; pulos = 3; }
+      else if (fase === 'base' && R.base.dts.length >= N_BASE) { T.pause = false; renderer.setPixelRatio(pr0 / 2); meiaOn = true; fase = 'meia'; pulos = 5; }
+      else if (fase === 'meia' && R.meia.dts.length >= N_MEIA) { renderer.setPixelRatio(pr0); meiaOn = false; fase = 'aguarda'; pulos = 0; }
+      else if (fase === 'ligar' && t - tLigou >= MS_LIGAR) { fase = 'mesa'; pulos = 30; }
+      else if (fase === 'mesa' && R.mesa.dts.length >= N_MESA) enviar('completo');
+      else if (fase === 'aguarda' && t - pronto > MS_ESPERA) { parcial += (parcial ? ' · ' : '') + 'não ligou a energia em 40 s'; enviar('tempo'); }
     },
   };
-})() : null;
+  return T;
+})();
 const perf = /perf/.test(location.search) ? (() => {
   const box = window.__perf.box;   // criado lá no começo da página
   const gl = renderer.getContext(), ext = gl.getExtension('WEBGL_debug_renderer_info'), gpu = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : 'não informado';
@@ -2677,22 +2791,10 @@ const perf = /perf/.test(location.search) ? (() => {
     if (!FORM_URL) { b && flash(b, 'envio não configurado'); return; }
     sent = true;
     fetch(FORM_URL, { method: 'POST', mode: 'no-cors', body: new URLSearchParams({ [FORM_ENTRY]: report() }) })
-      .then(() => { sendBtn.textContent = 'enviado ✓ (enviar de novo)'; if (BAT && !b) batNext(); }, () => { sendBtn.textContent = 'falhou (tentar de novo)'; if (BAT && !b) batNext(); });
+      .then(() => { sendBtn.textContent = 'enviado ✓ (enviar de novo)'; }, () => { sendBtn.textContent = 'falhou (tentar de novo)'; });
     sendBtn.textContent = 'enviando…';
   };
   const sendBtn = btn(FORM_URL ? 'enviar relatório' : 'enviar (não configurado)', send);
-  // ?perf&bateria: roda as configurações abaixo em sequência, uma por carregamento (o aa só muda abrindo a página de novo). Cada uma mede ~15 s na vista geral, envia o relatório e recarrega com a próxima; b=<n> na URL diz em qual está
-  const BAT = /bateria/.test(location.search) ? ['', 'escala=1.5', 'escala=1.5&aa=0', 'sombra=1024&lampada=0', 'suave=0', 'luzes=min'] : null;
-  const batN = BAT ? Math.min(BAT.length - 1, Math.max(0, parseInt(QP.get('b'), 10) || 0)) : 0;
-  let batMsg = BAT ? 'BATERIA  teste ' + (batN + 1) + ' de ' + BAT.length + ' · não toque na tela' : '';
-  const batNext = () => {
-    if (batN + 1 >= BAT.length) { batMsg = 'BATERIA CONCLUÍDA  ' + BAT.length + ' de ' + BAT.length + ' enviados'; box.style.color = '#5dff7a'; box.textContent = batMsg + '\n' + box.textContent.split('\n').slice(1).join('\n'); return; }
-    const p = new URLSearchParams(location.search);
-    for (const k of ['b', 'escala', 'aa', 'sombra', 'lampada', 'suave', 'luzes']) p.delete(k);
-    p.set('b', batN + 1);
-    new URLSearchParams(BAT[batN + 1]).forEach((v, k) => p.set(k, v));
-    setTimeout(() => location.replace(location.pathname + '?' + p.toString().replace(/=(?=&|$)/g, '')), 800);
-  };
   document.body.appendChild(bar);
   const placeBar = () => { bar.style.top = (box.getBoundingClientRect().bottom + 6) + 'px'; };
   return {
@@ -2704,7 +2806,7 @@ const perf = /perf/.test(location.search) ? (() => {
       last = t;
       if (t - shown < 500 || dts.length < 10) return; shown = t; window.__perf.live = true;
       const mean = dts.reduce((a, b) => a + b, 0) / dts.length, i = renderer.info.render, pr = renderer.getPixelRatio();
-      box.textContent = (batMsg ? batMsg + '\n' : '') + [
+      box.textContent = [
         'PERF  fps ' + f1(1000 / mean) + '   (últimos ' + dts.length + ' quadros)',
         'quadro: mediana ' + f1(q(dts, 0.5)) + ' ms · pior 5% ' + f1(q(dts, 0.95)) + ' ms · máx ' + f1(Math.max(...dts)) + ' ms',
         'engasgos (>33 ms): ' + dts.filter((d) => d > 33).length + ' de ' + dts.length,
@@ -2722,7 +2824,7 @@ const perf = /perf/.test(location.search) ? (() => {
         'toque: ' + (MOBILE ? 'sim' : 'não') + ' · ' + ua,
       ].join('\n');
       placeBar();
-      if (!sent && FORM_URL && ready != null && dts.length >= N && t - ready > 15000) send();
+      if (!sent && FORM_URL && !/debug/.test(location.search) && ready != null && dts.length >= N && t - ready > 15000) send();
     },
   };
 })() : null;
@@ -2731,13 +2833,13 @@ const perf = /perf/.test(location.search) ? (() => {
 // Sem energia: só o abajur está aceso (luz e brilho da cúpula compensam a exposição baixa, então ele parece sempre igual). O resto fica quase apagado: luzes gerais e reflexos do ambiente (envMapIntensity) em POWER_DARK / ENV_DARK,
 // e tudo o que brilha sozinho (visores do multímetro, da fonte, do osciloscópio e da impressora, LEDs e a fita sob a mesa, materiais sem iluminação) apagado.
 // Ao começar (~2 s): a luz geral e os reflexos sobem, o monitor liga e os aparelhos acendem um depois do outro, e a câmera sai de INTRO_OFF (20 cm atrás e 5 cm acima) e vem para a posição normal.
-// Só mexe em intensidades e cores de materiais (nada é recompilado). Com ?perf e ?export a cena já nasce acesa e a câmera já fica na posição normal.
-const POWER_DARK = 0.05, ENV_DARK = 0.22, POWER_DIM = 0.2, POWER_EXPO = renderer.toneMappingExposure, POWER_SKIP = PERF || /export/.test(location.search);
+// Só mexe em intensidades e cores de materiais (nada é recompilado). Com ?perf a cena já nasce acesa e a câmera já fica na posição normal.
+const POWER_DARK = 0.05, ENV_DARK = 0.22, POWER_DIM = 0.2, POWER_EXPO = renderer.toneMappingExposure, POWER_SKIP = PERF;
 const INTRO = !POWER_SKIP, INTRO_OFF = V(0, 0.05, 0.20);
 let rgbPower = POWER_SKIP ? 1 : 0, powerT0 = 0, powerDone = POWER_SKIP;
 const power = (() => {
   const amb = [], dev = [], lampMats = [], unlit = [], env = [], seen = new Set();
-  const skipM = new Set([screen.material, screenMatPlaceholder, ...rgbLeds.map(([m]) => m)]);
+  const skipM = new Set([screen.material, ...rgbLeds.map(([m]) => m)]);
   scene.traverse((o) => {
     if (o.isLight && o !== lampLight && o !== glow && o !== focusLight) amb.push([o, o.intensity]);
     if (!o.isMesh) return;
@@ -2799,10 +2901,11 @@ function frame(t) {
   cssCamera.fov = camera.fov; cssCamera.aspect = camera.aspect; cssCamera.updateProjectionMatrix();
   cssCamera.position.copy(camera.position).multiplyScalar(K); cssCamera.quaternion.copy(camera.quaternion);
   animate(dt, t); pulseTick(t); freeReadout(); entryPower(t);
-  renderer.render(scene, camera); cssRenderer.render(cssScene, cssCamera);
+  if (!(tele && tele.pause)) { if (tele) tele.beginGpu(); renderer.render(scene, camera); if (tele) tele.endGpu(); }   // a coleta pausa o desenho por uns 30 quadros (atrás da tela de entrada) para medir o ritmo do próprio aparelho
+  cssRenderer.render(cssScene, cssCamera);
   if (perf) perf.tick(t, performance.now() - p0);
-  if (tele) tele.tick(t);
-  if (first) { first = false; window.__veil.done(); if (perf) perf.ready(); if (tele) tele.ready(); if (/export/.test(location.search)) { exportGLB().catch((e) => { window.__glbInfo = { error: String(e) }; }); return; } }
+  if (tele) tele.tick(t, performance.now() - p0);
+  if (first) { first = false; window.__veil.done(); if (perf) perf.ready(); if (tele) tele.ready(); }
   requestAnimationFrame(frame);
 }
 T0.montada = performance.now();   // a cena está montada; falta só o primeiro quadro
