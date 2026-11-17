@@ -55,6 +55,7 @@ if (/perf/.test(location.search)) (function () {
   #lang i { width: 1px; height: 14px; background: var(--line); }
   #veil.ready:not(.off) { cursor: pointer; }
   #lang { cursor: default; }
+  #vnote { margin: 14px 0 0; text-align: center; font-size: 12px; line-height: 1.4; color: var(--ink-60); opacity: .75; }
   #lang button { font: inherit; letter-spacing: -.01em; color: var(--ink-60); background: none; border: 0; padding: 8px 4px; cursor: pointer; }
   #lang button[aria-pressed="true"] { color: var(--ink); text-decoration: underline; text-underline-offset: 4px; }
   #lang button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
@@ -130,6 +131,7 @@ if (/perf/.test(location.search)) (function () {
   </ol>
   <div class="vfoot"><div class="vbar"></div><button id="vgo" type="button" hidden data-k="go"></button></div>
   <div id="lang" role="group" aria-label="Idioma / Language"><button type="button" data-l="pt" aria-pressed="false">Português</button><i aria-hidden="true"></i><button type="button" data-l="en" aria-pressed="false">English</button></div>
+  <p id="vnote"></p>
 </div></div>
 <script>
 // Tela de entrada. O escritório começa a carregar na hora, por trás dela. Quando a cena fica pronta, aparece o botão de começar.
@@ -139,8 +141,8 @@ if (/perf/.test(location.search)) (function () {
   const coarse = matchMedia('(pointer: coarse)').matches, ask = !!(D && typeof D.requestPermission === 'function') && coarse;
   // idioma: o que a pessoa escolheu antes; senão, o do navegador (português ou inglês)
   const TXT = {
-    pt: { loading: 'montando a oficina…', ready: 'oficina pronta', s1m: 'mova o mouse para olhar em volta', s1t: 'incline o celular para olhar em volta', s2m: 'clique nos objetos para ver os projetos', s2t: 'toque nos objetos para ver os projetos', s3m: 'clique no monitor para abrir o portfólio', s3t: 'toque no monitor para abrir o portfólio', gom: 'clique para começar', got: 'toque para começar', view: 'ver projeto', next: 'próximo projeto', spin: 'arraste para girar', orbit: 'arraste para girar em volta', back: 'voltar para a oficina', frame: 'Portfólio de Felipe Collucci' },
-    en: { loading: 'building the workshop…', ready: 'workshop ready', s1m: 'move the mouse to look around', s1t: 'tilt your phone to look around', s2m: 'click the objects to see the projects', s2t: 'tap the objects to see the projects', s3m: 'click the monitor to open the portfolio', s3t: 'tap the monitor to open the portfolio', gom: 'click to start', got: 'tap to start', view: 'view project', next: 'next project', spin: 'drag to rotate', orbit: 'drag to look around', back: 'back to the workshop', frame: 'Felipe Collucci\'s portfolio' },
+    pt: { loading: 'montando a oficina…', ready: 'oficina pronta', s1m: 'mova o mouse para olhar em volta', s1t: 'incline o celular para olhar em volta', s2m: 'clique nos objetos para ver os projetos', s2t: 'toque nos objetos para ver os projetos', s3m: 'clique no monitor para abrir o portfólio', s3t: 'toque no monitor para abrir o portfólio', gom: 'clique para começar', got: 'toque para começar', view: 'ver projeto', next: 'próximo projeto', spin: 'arraste para girar', orbit: 'arraste para girar em volta', back: 'voltar para a oficina', frame: 'Portfólio de Felipe Collucci', beta: 'site em beta · usa ferramentas que medem o desempenho de forma anônima' },
+    en: { loading: 'building the workshop…', ready: 'workshop ready', s1m: 'move the mouse to look around', s1t: 'tilt your phone to look around', s2m: 'click the objects to see the projects', s2t: 'tap the objects to see the projects', s3m: 'click the monitor to open the portfolio', s3t: 'tap the monitor to open the portfolio', gom: 'click to start', got: 'tap to start', view: 'view project', next: 'next project', spin: 'drag to rotate', orbit: 'drag to look around', back: 'back to the workshop', frame: 'Felipe Collucci\'s portfolio', beta: 'beta site · uses tools that measure performance anonymously' },
   };
   let saved = null; try { saved = localStorage.getItem('lang'); } catch (e) {}
   const I = window.__i18n = { lang: saved === 'pt' || saved === 'en' ? saved : ((navigator.language || '').toLowerCase().startsWith('pt') ? 'pt' : 'en'), TXT, subs: [], t: (k) => TXT[I.lang][k], on: (fn) => I.subs.push(fn) };
@@ -148,6 +150,7 @@ if (/perf/.test(location.search)) (function () {
     const L = TXT[I.lang], k = coarse ? 't' : 'm';
     document.documentElement.lang = I.lang === 'pt' ? 'pt-BR' : 'en';
     msg.textContent = veil.classList.contains('ready') ? L.ready : L.loading;
+    document.getElementById('vnote').textContent = L.beta;
     veil.querySelectorAll('[data-k]').forEach((el) => { const d = el.dataset.k; el.textContent = d === 'go' ? L['go' + k] : L[d + k]; });
     veil.querySelectorAll('#lang button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.l === I.lang)));
   };
@@ -771,6 +774,9 @@ if (QP) {
   if (QP.get('suave') === '0') { Q.suave = false; Q.ativos.push('suave=0'); }
   if (QP.get('luzes') === 'min') { Q.luzesMin = true; Q.ativos.push('luzes=min'); }
 }
+// qualidade: o aparelho que mediu fps baixo numa visita anterior (coleta em segundo plano, lá no laço) abre sem suavização de bordas, porque essa troca só pode ser feita na abertura. ?qualidade=alta|leve força. Com ?perf só vale o que estiver na URL, para não contaminar os testes
+const QUAL = (() => { const f = (location.search.match(/qualidade=(alta|leve)/) || [])[1]; if (f || PERF) return f || 'alta'; try { return localStorage.getItem('qualidade') === 'leve' ? 'leve' : 'alta'; } catch (e) { return 'alta'; } })();
+if (QUAL === 'leve' && !(QP && QP.get('aa') === '1')) { Q.aa = false; Q.ativos.push('qualidade=leve'); }
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: Q.aa, alpha: true });
 renderer.setClearColor(0x000000, 0);
 renderer.setPixelRatio(Math.min(devicePixelRatio, Q.escala || 2));
@@ -2486,6 +2492,38 @@ async function exportGLB() {
 const clock = new THREE.Clock();
 let first = true;
 // ---------- modo de teste de desempenho (?perf): painel no canto com fps, tempo de cada quadro, desenhos por quadro e dados do aparelho. Só liga com ?perf no endereço; fora disso não existe e não custa nada ----------
+const FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfKcIdjqxYpsDhVtjcAHuGQSMdYJ9gm6xrKcdMslLjFlr3lHw/formResponse', FORM_ENTRY = 'entry.516893404';   // formulário do Felipe ligado a uma planilha: recebe os relatórios do ?perf e a coleta em segundo plano
+// ---------- coleta em segundo plano (site em beta): sem painel e sem atrasar nada, mede os quadros por ~15 s com a aba visível e envia UMA linha anônima por navegador (fps, tela, placa de vídeo). Se a mediana do quadro passar de 25 ms (abaixo de 40 fps), guarda 'qualidade=leve' para a PRÓXIMA visita abrir sem suavização. Não roda com ?perf, em localhost nem em arquivo local (?coleta força, para testar) ----------
+const tele = !PERF && !/export|debug|livre/.test(location.search) && ((location.protocol !== 'file:' && !/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) || /coleta/.test(location.search)) ? (() => {
+  try { if (localStorage.getItem('coleta') === '1' && !/coleta/.test(location.search)) return null; } catch (e) { return null; }
+  const dts = []; let last = 0, t0 = 0, skip = 20, sent = false, ready = 0;
+  const q = (a, p) => { const b = a.slice().sort((x, y) => x - y); return b[Math.min(b.length - 1, Math.floor(b.length * p))]; };
+  return {
+    ready() { ready = performance.now(); },
+    tick(t) {
+      if (sent) return;
+      if (document.visibilityState !== 'visible' || !document.hasFocus()) { last = 0; return; }   // só conta com a página visível e em foco: janela escondida ou em segundo plano roda devagar e daria fps baixo falso
+      if (last) { const d = t - last; if (d < 250) { if (skip > 0) skip--; else { dts.push(d); if (dts.length > 600) dts.shift(); } } }
+      last = t; if (!t0) t0 = t;
+      if (dts.length < 300 || t - t0 < 15000) return;
+      sent = true;
+      const fps = 1000 / (dts.reduce((a, b) => a + b, 0) / dts.length), i = renderer.info.render, gl = renderer.getContext(), ext = gl.getExtension('WEBGL_debug_renderer_info');
+      try { localStorage.setItem('coleta', '1'); if (q(dts, 0.5) > 25) localStorage.setItem('qualidade', 'leve'); } catch (e) {}
+      const txt = [
+        'COLETA v1  fps ' + fps.toFixed(1) + '   (' + dts.length + ' quadros)',
+        'quadro: mediana ' + q(dts, 0.5).toFixed(1) + ' ms · pior 5% ' + q(dts, 0.95).toFixed(1) + ' ms',
+        'engasgos (>33 ms): ' + dts.filter((d) => d > 33).length + ' de ' + dts.length,
+        'desenhos por quadro: ' + i.calls + ' · triângulos: ' + Math.round(i.triangles / 1000) + ' mil',
+        'tela: ' + innerWidth + '×' + innerHeight + ' · escala ' + renderer.getPixelRatio() + ' → ' + canvas.width + '×' + canvas.height + ' px',
+        'pronto em: ' + (ready / 1000).toFixed(1) + ' s',
+        'GPU: ' + (ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : 'não informado'),
+        'aparelho: ' + (MOBILE ? 'celular' : 'computador') + ' · qualidade: ' + QUAL + ' · modo: ' + state.mode,
+      ].join('\n');
+      window.__coleta = txt;
+      fetch(FORM_URL, { method: 'POST', mode: 'no-cors', body: new URLSearchParams({ [FORM_ENTRY]: txt }) }).catch(() => {});
+    },
+  };
+})() : null;
 const perf = /perf/.test(location.search) ? (() => {
   const box = window.__perf.box;   // criado lá no começo da página
   const gl = renderer.getContext(), ext = gl.getExtension('WEBGL_debug_renderer_info'), gpu = ext ? gl.getParameter(ext.UNMASKED_RENDERER_WEBGL) : 'não informado';
@@ -2497,7 +2535,6 @@ const perf = /perf/.test(location.search) ? (() => {
   const rede = () => { const r = performance.getEntriesByType('resource'), b = (navE ? navE.transferSize : 0) + r.reduce((a, e) => a + (e.transferSize || 0), 0); return b ? (b / 1048576).toFixed(2) + ' MB em ' + (r.length + 1) + ' arquivos' : 'nada (tudo veio do cache ou o navegador não informa)'; };
   const ua = (nav.userAgent.match(/\(([^)]*)\)/) || [0, '?'])[1].slice(0, 60);
   // relatório: botões "copiar" e "enviar" embaixo do painel; o envio vai para um Formulário Google ligado a uma planilha (o GitHub Pages não recebe dados). Com FORM_URL vazio, só o copiar funciona. O envio automático acontece uma vez, ~15 s depois de a cena ficar pronta
-  const FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfKcIdjqxYpsDhVtjcAHuGQSMdYJ9gm6xrKcdMslLjFlr3lHw/formResponse', FORM_ENTRY = 'entry.516893404';   // formulário "relatorio-perf" do Felipe, ligado a uma planilha
   let sent = false;
   const report = () => 'quando: ' + new Date().toLocaleString('pt-BR') + '\nendereço: ' + location.search + '\n' + box.textContent;
   const bar = document.createElement('div');
@@ -2584,7 +2621,8 @@ function frame(t) {
   animate(dt, t); pulseTick(t); freeReadout();
   renderer.render(scene, camera); cssRenderer.render(cssScene, cssCamera);
   if (perf) perf.tick(t, performance.now() - p0);
-  if (first) { first = false; window.__veil.done(); if (perf) perf.ready(); if (/export/.test(location.search)) { exportGLB().catch((e) => { window.__glbInfo = { error: String(e) }; }); return; } }
+  if (tele) tele.tick(t);
+  if (first) { first = false; window.__veil.done(); if (perf) perf.ready(); if (tele) tele.ready(); if (/export/.test(location.search)) { exportGLB().catch((e) => { window.__glbInfo = { error: String(e) }; }); return; } }
   requestAnimationFrame(frame);
 }
 T0.montada = performance.now();   // a cena está montada; falta só o primeiro quadro
