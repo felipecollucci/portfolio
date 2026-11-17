@@ -785,7 +785,7 @@ const PERF = !!window.__perf, perfStep = (name) => window.__perf.step(name);   /
 if (PERF) window.__perf.event('modulo');
 // progresso da entrada: cada etapa da cena avança o anel; a cada 3 etapas a montagem cede a vez para a tela pintar (com ?perf vale o passo do painel)
 let stepN = 0;
-const STEPS = 28, stepDone = (name) => {
+const STEPS = 27, stepDone = (name) => {
   if (PERF) return perfStep(name);
   stepN++; window.__veil.progress(0.15 + 0.7 * Math.min(1, stepN / STEPS));
   if (stepN % 3 === 0) return new Promise((r) => setTimeout(r, 0));
@@ -922,42 +922,56 @@ rbox(PB.w, PB.h, 0.012, 0.01, mat(C.board, { roughness: 0.6, metalness: 0.3 }), 
 })();
 const tools = group(room, 0, -DROP, PB.z + 0.008);
 const hook = (x, y, len = 0.03) => tube([[x, y, 0], [x, y, len * 0.7], [x, y + 0.01, len]], 0.0018, mat(C.steel, METAL), tools, 8, 6);
-// alicate: cabos emborrachados curvos, mordente de aço e pino
-const plier = (x, y, color, nose = 0.032) => {
-  const g = group(tools, x, y, 0.012); hook(x, y + 0.03, 0.02);
-  const rub = mat(color, { roughness: 0.42 }), st = mat(C.steel, METAL);
+const steelM = mat(C.steel, METAL);   // um aço só para todas as ferramentas do pegboard
+// alicate: duas metades de aço que se cruzam no pino (o mordente de um lado continua no cabo do outro), cabos emborrachados finos e achatados. Fica apoiado no gancho, que passa entre os cabos logo abaixo do pino. A origem do grupo é o pino
+// três tipos, pela silhueta do mordente: 'combo' (universal, ponta reta e larga), 'corte' (corte diagonal, cabeça curta e arredondada) e 'bico' (bico longo)
+const plier = (x, y, color, type = 'combo') => {
+  const g = group(tools, x, y, 0.012); hook(x, y - 0.027, 0.022);
+  const rub = mat(color, { roughness: 0.45 });
   [-1, 1].forEach((s) => {
-    tube([[s * 0.006, 0.0, 0], [s * 0.013, -0.04, 0], [s * 0.019, -0.085, 0], [s * 0.016, -0.11, 0]], 0.0062, rub, g, 24, 12);
-    add(new THREE.SphereGeometry(0.0065, 16, 12), rub, g, s * 0.016, -0.11, 0);
-    const jaw = new THREE.Shape(); jaw.moveTo(0, 0); jaw.lineTo(s * 0.006, 0); jaw.quadraticCurveTo(s * 0.006, nose * 0.6, s * 0.0012, nose); jaw.lineTo(0, nose); jaw.closePath();
-    const j = extrude(jaw, 0.004, st, g, 0.0008); j.position.z = s > 0 ? -0.004 : 0;
+    const h = new THREE.Shape(); h.moveTo(s * 0.0005, 0.008);
+    if (type === 'corte') { h.lineTo(s * 0.0005, 0.023); h.lineTo(s * 0.0014, 0.023); h.quadraticCurveTo(s * 0.0095, 0.019, s * 0.0085, 0.004); }
+    else if (type === 'bico') { h.lineTo(s * 0.0005, 0.039); h.lineTo(s * 0.0016, 0.039); h.quadraticCurveTo(s * 0.0052, 0.022, s * 0.0068, 0.004); }
+    else { h.lineTo(s * 0.0005, 0.03); h.lineTo(s * 0.0044, 0.03); h.lineTo(s * 0.0056, 0.027); h.lineTo(s * 0.0074, 0.012); h.lineTo(s * 0.0076, 0.003); }
+    h.lineTo(s * 0.0062, -0.004); h.lineTo(-s * 0.002, -0.017); h.lineTo(-s * 0.0085, -0.015); h.lineTo(-s * 0.0066, -0.004); h.lineTo(-s * 0.0036, 0.005); h.closePath();
+    const head = extrude(h, 0.0026, steelM, g, 0.0005); head.position.z = s > 0 ? -0.0031 : 0.0005; head.scale.set(1.45, 1.45, 1);   // medido contra a referência: cabeça = 34% do comprimento no universal, ~39% no bico, ~28% no de corte
+    // cabo arqueado e grosso (~11% do comprimento): abre para fora e volta a fechar na ponta, com um ressalto (guarda) no começo. O comprimento do cabo varia por tipo para os três ficarem com o mesmo comprimento total (~13 cm), como na referência
+    const hl = { combo: 0.08, corte: 0.086, bico: 0.072 }[type];
+    const ends = [[-s * 0.007, -0.017], [-s * 0.0135, -hl]];
+    tube([[ends[0][0], ends[0][1], 0], [-s * 0.0148, -0.463 * hl, 0], [-s * 0.0178, -0.756 * hl, 0], [ends[1][0], ends[1][1], 0]], 0.0066, rub, g, 24, 10).scale.z = 0.7;
+    add(new THREE.SphereGeometry(0.0078, 12, 8), rub, g, ends[0][0], ends[0][1], 0).scale.z = 0.6;
+    add(new THREE.SphereGeometry(0.0066, 12, 8), rub, g, ends[1][0], ends[1][1], 0).scale.z = 0.7;
   });
-  cyl(0.0058, 0.0058, 0.012, st, g, 0, 0.004, 0, 20).rotation.x = Math.PI / 2;
-  cyl(0.0026, 0.0026, 0.014, mat(C.dark), g, 0, 0.004, 0, 12).rotation.x = Math.PI / 2;
+  cyl(0.0058, 0.0058, 0.0085, steelM, g, 0, 0, 0, 20).rotation.x = Math.PI / 2;
+  cyl(0.002, 0.002, 0.0092, mat(C.dark), g, 0, 0, 0, 12).rotation.x = Math.PI / 2;
 };
-plier(-0.31, 1.47, C.toolBlue); plier(-0.245, 1.47, C.red); plier(-0.18, 1.47, C.yellow, 0.045);
-(() => { // tesoura de cabos azuis
-  const g = group(tools, -0.105, 1.46, 0.012); hook(-0.105, 1.48, 0.02);
-  const st = mat(C.steel, METAL), rub = mat(C.toolBlue, { roughness: 0.42 });
+plier(-0.31, 1.464, C.toolBlue, 'combo'); plier(-0.245, 1.464, C.red, 'corte'); plier(-0.18, 1.464, C.yellow, 'bico');   // pino 1 cm mais baixo: a ponta do bico (maior) não passa da borda do painel
+(() => { // tesoura de cabos azuis: argolas finas, hastes que descem até o parafuso e lâminas largas no parafuso afinando até a ponta. Fica pendurada por uma das argolas, por isso levemente inclinada
+  const hx = -0.1, hy = 1.47; hook(hx, hy, 0.022);
+  const tilt = group(tools, hx, hy, 0.012); tilt.rotation.z = 0.08;
+  const g = group(tilt, -0.0125, -0.009, 0);
+  const rub = mat(C.toolBlue, { roughness: 0.45 });
   [-1, 1].forEach((s) => {
-    const loop = add(new THREE.TorusGeometry(0.014, 0.0045, 12, 32), rub, g, s * 0.015, 0.0, 0); loop.scale.set(1, 1.35, 1);
-    const blade = new THREE.Shape(); blade.moveTo(s * 0.005, -0.012); blade.lineTo(s * 0.0015, -0.11); blade.lineTo(-s * 0.002, -0.1); blade.lineTo(-s * 0.001, -0.012); blade.closePath();
-    const b = extrude(blade, 0.0015, st, g, 0.0004); b.position.z = s > 0 ? 0.002 : 0;
+    add(new THREE.TorusGeometry(0.0105, 0.003, 10, 28), rub, g, s * 0.0125, 0, 0).scale.set(1, 1.3, 1);
+    const b = new THREE.Shape(); b.moveTo(s * 0.007, -0.012); b.lineTo(s * 0.0125, -0.014); b.lineTo(s * 0.0058, -0.032); b.lineTo(s * 0.0046, -0.065); b.lineTo(s * 0.0003, -0.118);
+    b.lineTo(-s * 0.0058, -0.036); b.lineTo(-s * 0.002, -0.026); b.closePath();
+    extrude(b, 0.001, steelM, g, 0.0003).position.z = s > 0 ? 0.0003 : -0.0013;
   });
-  cyl(0.004, 0.004, 0.008, st, g, 0, -0.018, 0.001, 16).rotation.x = Math.PI / 2;
+  cyl(0.0028, 0.0028, 0.0042, steelM, g, 0, -0.031, 0, 16).rotation.x = Math.PI / 2;
 })();
 [0.0, 0.025, 0.05].forEach((dx) => hook(0.0 + dx, 1.5, 0.028)); // ganchos vazios
-// chaves de precisão: cabo torneado, tampa colorida, haste de aço
+// chaves de fenda: cabo torneado (pescoço fino junto à haste, barriga e topo arredondado), tampa colorida, haste de aço. Ficam apoiadas no suporte pelo cabo, com a haste atravessando para baixo
+const driverM = mat(C.dark, { roughness: 0.4 });
 const driver = (x, y, cap, ring) => {
   const g = group(tools, x, y, 0.016);
-  lathe([[0, -0.034], [0.0062, -0.033], [0.0075, -0.025], [0.0075, 0.02], [0.0068, 0.028], [0.0068, 0.034], [0, 0.035]], mat(C.dark, { roughness: 0.4 }), g, 0, 0, 0, 20);
-  cyl(0.0071, 0.0071, 0.008, mat(cap, { roughness: 0.35 }), g, 0, 0.032, 0, 20);
-  if (ring) cyl(0.0078, 0.0078, 0.005, mat(ring, { roughness: 0.4 }), g, 0, -0.022, 0, 20);
-  cyl(0.0019, 0.0019, 0.055, mat(C.steel, METAL), g, 0, -0.061, 0, 10);
+  lathe([[0, -0.034], [0.0036, -0.034], [0.0045, -0.029], [0.0046, -0.022], [0.0066, -0.014], [0.0077, -0.002], [0.0075, 0.012], [0.0064, 0.021], [0.0071, 0.028]], driverM, g, 0, 0, 0, 20);
+  lathe([[0.0071, 0.028], [0.0073, 0.032], [0.0064, 0.0355], [0.004, 0.0368], [0, 0.037]], mat(cap, { roughness: 0.35 }), g, 0, 0, 0, 20);
+  if (ring) cyl(0.008, 0.008, 0.004, mat(ring, { roughness: 0.4 }), g, 0, 0.003, 0, 20);
+  cyl(0.0019, 0.0019, 0.055, steelM, g, 0, -0.061, 0, 10);
 };
 const driverRack = (y) => rbox(0.2, 0.012, 0.02, 0.003, mat(C.graphite, { metalness: 0.3 }), tools, 0.235, y, 0.012);
-driverRack(1.512); [C.toolBlue, C.toolBlue, C.red, C.yellow, C.yellow].forEach((c, i) => driver(0.165 + i * 0.035, 1.47, c));
-driverRack(1.382); [0, 1, 2, 3, 4].forEach((i) => driver(0.165 + i * 0.035, 1.34, C.dark, C.red));
+driverRack(1.44); [C.toolBlue, C.toolBlue, C.red, C.yellow, C.yellow].forEach((c, i) => driver(0.165 + i * 0.035, 1.48, c));
+driverRack(1.295); [0, 1, 2, 3, 4].forEach((i) => driver(0.165 + i * 0.035, 1.335, C.dark, C.red));
 
 // ---------- prateleiras de nogueira com mãos-francesas pretas ----------
 mark('Prateleiras'); await stepDone('Prateleiras');
@@ -1456,12 +1470,17 @@ const ps1 = solderSpool(tools); ps1.position.set(0.05, 1.4922, 0.018); ps1.rotat
   rbox(0.022, 0.2, 0.0015, 0.0006, mat(0xffffff, { map: t, metalness: 0.85, roughness: 0.3, envMapIntensity: 1 }), tools, -0.392, 1.383, 0.006, 1);
 })();
 (() => { // chave de boca pendurada pelo anel
-  const st = mat(C.steel, METAL);
-  hook(0.125, 1.47, 0.02);
-  add(new THREE.TorusGeometry(0.0085, 0.0032, 10, 24), st, tools, 0.125, 1.463, 0.008);
-  rbox(0.011, 0.088, 0.0038, 0.0015, st, tools, 0.125, 1.41, 0.008);
-  cyl(0.0145, 0.0145, 0.004, st, tools, 0.125, 1.356, 0.008, 28).rotation.x = Math.PI / 2;
-  rbox(0.011, 0.016, 0.006, 0.001, mat(C.hole, { roughness: 1 }), tools, 0.125, 1.348, 0.008);
+  // três chapas da mesma espessura: olhal (com furo de verdade, por onde passa o gancho), haste e boca aberta em U, levemente girada como numa chave real
+  const g = group(tools, 0.125, 1.41, 0.0063), T = 0.0028, B = 0.0003;
+  hook(0.125, 1.4667, 0.02);
+  const eye = new THREE.Shape(); eye.absarc(0, 0, 0.0095, 0, Math.PI * 2, false);
+  const hole = new THREE.Path(); hole.absarc(0, 0, 0.0055, 0, Math.PI * 2, true); eye.holes.push(hole);
+  extrude(eye, T, steelM, g, B).position.y = 0.053;
+  const shaft = new THREE.Shape(); shaft.moveTo(-0.0048, 0.046); shaft.lineTo(0.0048, 0.046); shaft.lineTo(0.0056, -0.044); shaft.lineTo(-0.0056, -0.044); shaft.closePath();
+  extrude(shaft, T, steelM, g, B);
+  const R = 0.0135, a = Math.asin(0.0052 / R), mouth = new THREE.Shape();
+  mouth.moveTo(0.0052, 0.003); mouth.lineTo(0.0052, -R * Math.cos(a)); mouth.absarc(0, 0, R, -Math.PI / 2 + a, Math.PI * 1.5 - a, false); mouth.lineTo(-0.0052, 0.003); mouth.closePath();
+  const head = extrude(mouth, T, steelM, g, B); head.position.y = -0.054; head.rotation.z = 0.26;
 })();
 (() => { // caixinhas penduradas: canetas e bastões de cola quente
   const binM = mat(0x3f4a5c, { roughness: 0.55 });
@@ -1888,70 +1907,6 @@ mark('Chão e embaixo da mesa'); await stepDone('Chão e embaixo da mesa');
   const under = new THREE.SpotLight(0x9fb4ff, 1.6, 1.6, 1.25, 1, 1.4); under.position.set(0, 0.69, 0.2); under.target.position.set(0, 0, 0.25); if (!Q.luzesMin) scene.add(under, under.target);   // foco apontado para o chão: ilumina o vão sem subir para os objetos em cima da mesa
 })();
 
-// ---------- janela de correr com persiana rolô e ar-condicionado de janela em cima, no canto direito da parede (logo depois do fim da mesa) ----------
-// fica fora da vista normal de propósito: aparece em telas bem largas e na câmera livre. Não tem luz própria (lá fora é noite), então não pesa na iluminação
-mark('Janela e ar-condicionado'); await stepDone('Janela e ar-condicionado');
-(() => {
-  const WX = 1.72, WW = 0.62, WH = 0.9, Y0 = 1.0, YC = Y0 + WH / 2, YT = Y0 + WH;   // centro em x, largura, altura, peitoril, meio e topo do vão
-  const g = group(room, WX, 0, -0.47);   // encostado na parede do fundo
-  const white = mat(0xe9e6df, { roughness: 0.7 }), alu = mat(0xb9bcc2, { roughness: 0.35, metalness: 0.7, envMapIntensity: 0.8 });
-  const plastic = mat(0xe4e0d6, { roughness: 0.55 }), plastic2 = mat(0xd9d5ca, { roughness: 0.6 }), slot = mat(0x2a2b2e, { roughness: 0.85 });
-  const noSh = (m) => { m.userData.noShadow = true; return m; };
-
-  // lá fora, à noite: céu escuro, o prédio vizinho com algumas janelas acesas e a copa de uma árvore
-  const night = canvasTex(256, 372, (c, w, h) => {
-    const sky = c.createLinearGradient(0, 0, 0, h); sky.addColorStop(0, '#0a0f1f'); sky.addColorStop(1, '#1b2338'); c.fillStyle = sky; c.fillRect(0, 0, w, h);
-    c.fillStyle = '#242833'; c.fillRect(w * 0.52, 0, w * 0.48, h);
-    c.fillStyle = '#1c2029'; for (let y = 20; y < h; y += 62) c.fillRect(w * 0.52, y + 44, w * 0.48, 4);
-    [[0.62, 30, 1], [0.82, 30, 0], [0.62, 92, 0], [0.82, 92, 1], [0.62, 154, 0], [0.82, 154, 0], [0.62, 216, 1], [0.82, 216, 0], [0.62, 278, 0], [0.82, 278, 1]].forEach(([x, y, on]) => { c.fillStyle = on ? '#e8b45e' : '#12151c'; c.fillRect(w * x, y, 34, 30); });
-    c.fillStyle = '#0c1611'; [[40, 250, 70], [90, 200, 60], [30, 150, 50], [100, 300, 80], [60, 340, 70], [120, 250, 45]].forEach(([x, y, r]) => { c.beginPath(); c.arc(x, y, r, 0, 7); c.fill(); });
-  });
-  noSh(add(new THREE.PlaneGeometry(WW, WH), new THREE.MeshBasicMaterial({ map: night }), g, 0, YC, 0.004));
-
-  // moldura branca do vão e peitoril
-  const T = 0.035;
-  rbox(WW + 2 * T, T, 0.03, 0.004, white, g, 0, YT + T / 2, 0.015, 2);
-  [-1, 1].forEach((s) => rbox(T, WH, 0.03, 0.004, white, g, s * (WW / 2 + T / 2), YC, 0.015, 2));
-  rbox(WW + 2 * T + 0.04, 0.03, 0.075, 0.006, white, g, 0, Y0 - 0.015, 0.0375, 2);
-
-  // duas folhas de correr em alumínio, uma na frente da outra, com vidro
-  const glass = mat(0xcfd8e2, { transparent: true, opacity: 0.14, roughness: 0.05, envMapIntensity: 1.2, depthWrite: false });
-  const B = 0.018, SW = WW / 2 + 0.01;
-  const sash = (cx, z) => {
-    [-1, 1].forEach((s) => { rbox(SW, B, 0.012, 0.002, alu, g, cx, YC + s * (WH / 2 - B / 2), z, 1); rbox(B, WH, 0.012, 0.002, alu, g, cx + s * (SW / 2 - B / 2), YC, z, 1); });
-    noSh(add(new THREE.PlaneGeometry(SW - 2 * B, WH - 2 * B), glass, g, cx, YC, z));
-  };
-  sash(-WW / 4 + 0.005, 0.012); sash(WW / 4 - 0.005, 0.026);
-  rbox(0.012, 0.07, 0.014, 0.003, alu, g, 0.025, Y0 + 0.12, 0.04, 1);   // puxador da folha da frente
-
-  // persiana rolô meio abaixada: tubo em cima, tecido cru, barra na ponta e a cordinha de bolinhas do lado direito
-  const fabricTex = canvasTex(128, 128, (c, w, h) => { c.fillStyle = '#d8d2c2'; c.fillRect(0, 0, w, h); for (let i = 0; i < 1600; i++) { const r = Math.random, L = 5 + r() * 12; c.fillStyle = r() < 0.5 ? 'rgba(255,255,255,.07)' : 'rgba(80,70,50,.07)'; if (i % 2) c.fillRect(r() * w, r() * h, L, 1); else c.fillRect(r() * w, r() * h, 1, L); } });   // trama do tecido: fiapos claros e escuros, na horizontal e na vertical
-  const fabric = mat(0xffffff, { map: fabricTex, roughness: 0.95, side: THREE.DoubleSide, envMapIntensity: 0.1 });
-  const RY = YT + 0.05, RW = WW + 0.07, DROPB = 0.36;   // altura do tubo, largura da persiana e quanto ela está abaixada
-  cyl(0.02, 0.02, RW, mat(0xd8d2c2, { roughness: 0.9 }), g, 0, RY, 0.05, 20).rotation.z = Math.PI / 2;
-  [-1, 1].forEach((s) => rbox(0.012, 0.05, 0.05, 0.004, white, g, s * (RW / 2 + 0.006), RY, 0.045, 1));   // suportes
-  add(new THREE.PlaneGeometry(RW, DROPB), fabric, g, 0, RY - DROPB / 2, 0.07);
-  rbox(RW, 0.014, 0.01, 0.003, mat(0xcfc9b9, { roughness: 0.8 }), g, 0, RY - DROPB, 0.07, 1);
-  tube([[RW / 2 + 0.006, RY, 0.07], [RW / 2 + 0.012, RY - 0.4, 0.068], [RW / 2 + 0.03, RY - 0.9, 0.06], [RW / 2 + 0.04, RY - 1.15, 0.05]], 0.0016, mat(0xe9e6df, { roughness: 0.6 }), g, 24, 5);
-
-  // ar-condicionado de janela, apoiado numa prateleira branca acima da persiana
-  const AX = -0.03, AW = 0.56, AH = 0.36, AD = 0.17, AY0 = YT + 0.11, AYC = AY0 + AH / 2, AZ = AD;   // AZ: face da frente
-  rbox(AW + 0.05, 0.018, AD + 0.04, 0.004, white, g, AX, AY0 - 0.009, (AD + 0.04) / 2, 1);
-  rbox(AW, AH, AD, 0.012, plastic, g, AX, AYC, AD / 2, 3);
-  // painel da esquerda com cinco frisos
-  rbox(0.33, 0.215, 0.01, 0.008, plastic2, g, AX - 0.1, AYC + 0.055, AZ + 0.002, 2);
-  for (let i = 0; i < 5; i++) rbox(0.28, 0.004, 0.004, 0.001, slot, g, AX - 0.1, AYC + 0.135 - i * 0.04, AZ + 0.007, 1);
-  // saída de ar à direita: rasgo escuro com aletas inclinadas
-  rbox(0.1, 0.29, 0.006, 0.006, slot, g, AX + 0.16, AYC + 0.01, AZ + 0.001, 2);
-  for (let i = 0; i < 10; i++) rbox(0.088, 0.005, 0.02, 0.001, plastic, g, AX + 0.16, AYC + 0.135 - i * 0.028, AZ + 0.006, 1).rotation.x = 0.55;
-  // dois botões giratórios e a plaquinha da marca
-  [-0.035, 0.03].forEach((dx) => {
-    cyl(0.02, 0.02, 0.012, plastic2, g, AX - 0.1 + dx, AY0 + 0.05, AZ + 0.006, 24).rotation.x = Math.PI / 2;
-    cyl(0.012, 0.012, 0.01, mat(0xbdb9ae, { roughness: 0.5 }), g, AX - 0.1 + dx, AY0 + 0.05, AZ + 0.014, 20).rotation.x = Math.PI / 2;
-  });
-  rbox(0.045, 0.008, 0.002, 0.001, alu, g, AX - 0.1, AY0 + 0.092, AZ + 0.003, 1);
-})();
-
 mark('Parede (decoração)'); await stepDone('Parede (decoração)');
 (() => {
   const WZ = -0.4685;
@@ -2090,6 +2045,65 @@ if (!/export/.test(location.search)) {
   dedupe(scene);
   console.info('materiais (fora dos projetos e do monitor): ' + seen.size + ' antes, ' + (shared.size + unkeyed.size) + ' depois');
 
+  // 1b) acabamentos quase iguais viram um só: a cor passa para um atributo da malha (cor por vértice) e rugosidade, metal e reflexo do ambiente são arredondados para poucos degraus,
+  // então a fusão abaixo junta muito mais peças. Só materiais opacos, sem imagem nem brilho próprio, dentro de room; ficam de fora os LEDs RGB, a tela, os visores e a lâmpada (emissivos ou sem iluminação,
+  // que a energia liga um a um) e os projetos (que têm o próprio passo, 2b). A conta da cor não muda: o material fica branco e a cor da malha é a cor linear que o material tinha. ?semcor desliga.
+  const qB = (v, cuts, vals) => { for (let i = 0; i < cuts.length; i++) if (v <= cuts[i]) return vals[i]; return vals[vals.length - 1]; };
+  const MAPS = ['map', 'alphaMap', 'aoMap', 'bumpMap', 'displacementMap', 'emissiveMap', 'envMap', 'lightMap', 'metalnessMap', 'normalMap', 'roughnessMap', 'clearcoatMap', 'sheenColorMap', 'transmissionMap'];
+  // família do material: mesmas propriedades, exceto cor, rugosidade, metal e reflexo, que entram arredondados (rugosidade 0,30/0,45/0,70/0,92; metal 0,02/0,30/0,60/0,90; reflexo 0,10/0,35/0,90)
+  const vcFamily = (m, exact) => {   // exact (projetos): rugosidade, metal e reflexo ficam como estão, só a cor sai da família
+    const k0 = matKey(m); if (!k0) return null;
+    const r = exact ? m.roughness : qB(m.roughness, [0.34, 0.57, 0.8], [0.3, 0.45, 0.7, 0.92]), mt = exact ? m.metalness : qB(m.metalness, [0.17, 0.45, 0.78], [0.02, 0.3, 0.6, 0.9]), e = exact ? m.envMapIntensity : qB(m.envMapIntensity, [0.2, 0.6], [0.1, 0.35, 0.9]);
+    return { key: k0.replace(/\|(color|roughness|metalness|envMapIntensity)=[^|]*/g, '') + '|q' + r + ',' + mt + ',' + e, r, mt, e };
+  };
+  // passa a cor do material da malha o para um atributo de vértice e troca o material pelo da família (criado na primeira vez)
+  const vcApply = (o, fam, skip, exact) => {
+    if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || o.userData.hitbox || Array.isArray(o.material)) return false;
+    const m = o.material, g = o.geometry;
+    if (!m || m.type !== 'MeshStandardMaterial' || (skip && skip.has(m)) || m.vertexColors || m.transparent !== false || m.visible === false || MAPS.some((k) => m[k]) || m.emissive.getHex() !== 0) return false;
+    if (!g || !g.attributes.position || g.attributes.color || Object.keys(g.morphAttributes).length) return false;
+    if (['position', 'normal', 'uv'].some((n) => g.attributes[n] && (g.attributes[n].isInterleavedBufferAttribute || g.attributes[n].normalized))) return false;
+    const f = vcFamily(m, exact); if (!f) return false;
+    let c = fam.get(f.key); if (!c) { c = m.clone(); c.color.setRGB(1, 1, 1); c.vertexColors = true; c.roughness = f.r; c.metalness = f.mt; c.envMapIntensity = f.e; fam.set(f.key, c); }
+    const ng = g.clone(), n = ng.attributes.position.count, col = new Float32Array(n * 3);
+    for (let i = 0; i < n; i++) { col[i * 3] = m.color.r; col[i * 3 + 1] = m.color.g; col[i * 3 + 2] = m.color.b; }
+    ng.setAttribute('color', new THREE.BufferAttribute(col, 3));
+    o.geometry = ng; o.material = c; return true;
+  };
+  // 1a) imagens pequenas e ilegíveis (etiquetas, lombadas, faixas, réguas, rótulo da bateria; o gaveteiro de componentes, os 3 post-its, a lista de compras, a pinagem do Arduino e o painel de LEDs ficaram com imagem a pedido do Felipe) viram uma cor lisa: a média da imagem. Identificadas por tamanho da imagem em pixels e posição em cm (o Felipe escolheu em 17/11/2026).
+  // Ficam com imagem: chão, tapete, parede, mesa, prateleira, instrumentos com visor, bancada de ferramentas, papéis e quadros da parede. ?semcor desliga.
+  const SMALL_IMG = new Set(['64x128@5,147,-41', '32x512@-39,136,-43', '128x48@39,138,-39', '128x48@39,128,-39', '64x256@93,137,-36', '64x256@98,137,-36', '64x256@103,137,-36', '1360x64@43,75,25', '128x48@81,110,-18', '64x256@63,117,-20', '64x256@68,117,-20', '64x256@73,117,-20', '64x256@78,117,-20', '160x64@-97,137,-34', '64x44@-89,132,-36', '160x52@-79,111,-31', '64x128@-27,76,-12', '256x96@-39,77,13', '200x68@-93,12,30', '200x68@-93,33,30', '200x68@-93,54,30', '200x68@93,16,30', '200x68@93,48,30']);
+  if (!/semcor/.test(location.search)) {
+    const smallMaps = new Set(), avg = new Map(), bb = new THREE.Box3(), cc = new THREE.Vector3();
+    room.updateMatrixWorld(true);
+    room.traverse((o) => {
+      if (!o.isMesh || Array.isArray(o.material) || !o.material.map || smallMaps.has(o.material.map)) return;
+      const im = o.material.map.image; if (!im) return;
+      bb.setFromObject(o); bb.getCenter(cc);
+      if (SMALL_IMG.has(im.width + 'x' + im.height + '@' + Math.round(cc.x * 100) + ',' + Math.round(cc.y * 100) + ',' + Math.round(cc.z * 100))) smallMaps.add(o.material.map);
+    });
+    const avgColor = (tex) => {
+      let c = avg.get(tex); if (c) return c;
+      const cv = document.createElement('canvas'); cv.width = cv.height = 8; const g = cv.getContext('2d'); g.drawImage(tex.image, 0, 0, 8, 8);
+      const d = g.getImageData(0, 0, 8, 8).data; let r = 0, gg = 0, b = 0, n = 0; for (let i = 0; i < d.length; i += 4) { if (d[i + 3] < 8) continue; r += d[i]; gg += d[i + 1]; b += d[i + 2]; n++; }
+      c = new THREE.Color().setRGB(r / Math.max(1, n) / 255, gg / Math.max(1, n) / 255, b / Math.max(1, n) / 255, THREE.SRGBColorSpace); avg.set(tex, c); return c;
+    };
+    const flat = new Map(); let nf = 0;
+    room.traverse((o) => {
+      if (!o.isMesh || Array.isArray(o.material) || !smallMaps.has(o.material.map)) return;
+      const m = o.material; let n = flat.get(m);
+      if (!n) { n = m.clone(); n.color.copy(avgColor(m.map)); n.map = null; n.needsUpdate = true; flat.set(m, n); }
+      o.material = n; nf++;
+    });
+    console.info('imagens pequenas viraram cor: ' + smallMaps.size + ' imagens, ' + nf + ' malhas');
+  }
+
+  if (!/semcor/.test(location.search)) {
+    const fam = new Map(); let fm = 0;
+    room.traverse((o) => { if (vcApply(o, fam, protectedMats)) fm++; });
+    console.info('cor por vértice (sala): ' + fm + ' malhas, ' + fam.size + ' materiais');
+  }
+
   // 2) objetos parados de room com o mesmo material (e mesmas flags de sombra) viram uma malha só: menos draw calls
   // fora: invisíveis, instanciados, skinned, com morph/interleaved, material transparente, em array ou protegido (LEDs RGB, tela), hitbox, onBeforeRender/depth próprios, frustumCulled=false; os projetos e o monitor nem estão em room
   {
@@ -2138,6 +2152,63 @@ if (!/export/.test(location.search)) {
       before += list.length; after++;
     });
     console.info('fusão: ' + before + ' meshes viraram ' + after);
+  }
+
+  // 2b) modelos dos projetos: dentro de cada projeto, materiais idênticos viram um só e as partes que não animam com o mesmo material viram uma malha só (menos draw calls).
+  // Quais partes animam é medido de verdade: roda a animação por um ciclo (ou ~3 s) e anota todo nó que muda de posição, giro ou escala; esses nós e tudo o que está dentro deles ficam como estão.
+  // O dedupe é por projeto (o brilho de chamar atenção mexe no emissive do material: dois projetos não podem dividir material). Os materiais continuam sendo os mesmos objetos, só passam a ser menos.
+  if (!/semfusao/.test(location.search)) for (const id in P) {
+    const m = P[id], root = m.built.root, nodes = []; root.traverse((o) => nodes.push(o));
+    const snap = nodes.map((o) => [o.position.clone(), o.quaternion.clone(), o.scale.clone()]), moved = new Set();
+    const N = m.cycle ? 44 : 24, sdt = m.cycle ? m.cycle / 44 : 0.137;
+    for (let i = 0; i < N; i++) {
+      m.step(sdt);
+      nodes.forEach((o, j) => { if (moved.has(o)) return; const q = snap[j]; if (o.position.distanceToSquared(q[0]) > 1e-12 || Math.abs(1 - Math.abs(o.quaternion.dot(q[1]))) > 1e-10 || o.scale.distanceToSquared(q[2]) > 1e-12) moved.add(o); });
+    }
+    nodes.forEach((o, j) => { o.position.copy(snap[j][0]); o.quaternion.copy(snap[j][1]); o.scale.copy(snap[j][2]); o.updateMatrix(); });
+    // matriz de cada nó relativa à raiz do modelo (a raiz em si fica de fora: a malha fundida é filha dela)
+    const rel = new Map([[root, new THREE.Matrix4()]]);
+    nodes.forEach((o) => { if (o !== root) rel.set(o, new THREE.Matrix4().multiplyMatrices(rel.get(o.parent), o.matrix)); });
+    const free = (o) => { for (let a = o; a; a = a.parent) { if (moved.has(a) || !a.visible) return false; if (a === root) return true; } return false; };
+    const share = new Map(); let mats0 = new Set(), mats1 = new Set();
+    nodes.forEach((o) => { if (!o.isMesh || Array.isArray(o.material)) return; mats0.add(o.material); const k = matKey(o.material); if (!k) { mats1.add(o.material); return; } const f = share.get(k); if (f) o.material = f; else { share.set(k, o.material); mats1.add(o.material); } });
+    if (!/semcor/.test(location.search)) { const fam = new Map(); nodes.forEach((o) => { if (o.isMesh) { const before = o.material; if (vcApply(o, fam, null, true)) { mats1.delete(before); mats1.add(o.material); } } }); mats1 = new Set([...mats1].filter((mt) => nodes.some((o) => o.material === mt))); }   // cor por vértice dentro do projeto (a família é só deste projeto, então o brilho de atenção continua agindo no objeto inteiro)
+    const groups = new Map();
+    nodes.forEach((o) => {
+      if (!o.isMesh || o.isInstancedMesh || o.isSkinnedMesh || !free(o)) return;
+      const mt = o.material, g = o.geometry;
+      if (!mt || Array.isArray(mt) || mt.transparent !== false || mt.visible === false || !g || !g.attributes.position || Object.keys(g.morphAttributes).length) return;
+      if (!o.frustumCulled || Object.prototype.hasOwnProperty.call(o, 'onBeforeRender') || o.customDepthMaterial || o.customDistanceMaterial || g.drawRange.count !== Infinity || g.drawRange.start !== 0) return;
+      const names = Object.keys(g.attributes).sort();
+      if (names.some((n) => { const a = g.attributes[n]; return a.isInterleavedBufferAttribute || a.normalized || !(a.array instanceof Float32Array); })) return;
+      const key = [mt.uuid, o.renderOrder, o.layers.mask, !!g.index, names.map((n) => n + g.attributes[n].itemSize).join(',')].join('|');
+      let l = groups.get(key); if (!l) groups.set(key, l = []); l.push(o);
+    });
+    let before = 0, after = 0;
+    groups.forEach((list) => {
+      if (list.length < 2) return;
+      const names = Object.keys(list[0].geometry.attributes), indexed = !!list[0].geometry.index;
+      const parts = list.map((o) => { const g = o.geometry.clone(); g.clearGroups(); g.applyMatrix4(rel.get(o)); return [g, rel.get(o).determinant() < 0]; });
+      let nv = 0, ni = 0; parts.forEach(([g]) => { nv += g.attributes.position.count; if (indexed) ni += g.index.count; });
+      const out = new THREE.BufferGeometry();
+      names.forEach((n) => { const sz = parts[0][0].attributes[n].itemSize, arr = new Float32Array(nv * sz); let off = 0; parts.forEach(([g]) => { arr.set(g.attributes[n].array, off); off += g.attributes[n].array.length; }); out.setAttribute(n, new THREE.BufferAttribute(arr, sz)); });
+      if (indexed) {
+        const idx = nv > 65535 ? new Uint32Array(ni) : new Uint16Array(ni); let io = 0, vo = 0;
+        parts.forEach(([g, mirror]) => { const a = g.index.array; for (let i = 0; i < a.length; i += 3) { idx[io + i] = a[i] + vo; idx[io + i + 1] = a[i + (mirror ? 2 : 1)] + vo; idx[io + i + 2] = a[i + (mirror ? 1 : 2)] + vo; } io += a.length; vo += g.attributes.position.count; });
+        out.setIndex(new THREE.BufferAttribute(idx, 1));
+      } else {
+        let vo = 0;   // sem índice: espelhamento troca o 2º e o 3º vértice de cada triângulo, em todos os atributos
+        parts.forEach(([g, mirror]) => { if (mirror) names.forEach((n) => { const a = out.attributes[n], sz = a.itemSize, d = a.array, c = g.attributes.position.count; for (let v = 0; v + 2 < c; v += 3) for (let k = 0; k < sz; k++) { const i1 = (vo + v + 1) * sz + k, i2 = (vo + v + 2) * sz + k, t = d[i1]; d[i1] = d[i2]; d[i2] = t; } }); vo += g.attributes.position.count; });
+      }
+      parts.forEach(([g]) => g.dispose());
+      out.computeBoundingSphere(); out.computeBoundingBox();
+      const first = list[0], merged = new THREE.Mesh(out, first.material);
+      merged.name = 'fundido'; merged.castShadow = first.castShadow; merged.receiveShadow = first.receiveShadow; merged.renderOrder = first.renderOrder; merged.layers.mask = first.layers.mask;
+      list.forEach((o) => o.removeFromParent());
+      root.add(merged); before += list.length; after++;
+    });
+    m.pose = []; root.traverse((o) => m.pose.push([o, o.position.clone(), o.quaternion.clone()]));   // a pose de repouso passa a ter só os nós que sobraram
+    console.info('fusão do modelo ' + id + ': materiais ' + mats0.size + ' -> ' + mats1.size + ', malhas ' + before + ' -> ' + after + ' (' + moved.size + ' nós animados)');
   }
 
   // 3) matrizes paradas: nada dentro de room se mexe depois da montagem (os projetos e o monitor ficam em scene, fora de room; floorGlow só muda de cor), então a matriz local é calculada uma vez
