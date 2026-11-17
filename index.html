@@ -35,6 +35,9 @@ if (/perf/.test(location.search)) (function () {
 })();
 </script>
 <title>Felipe Collucci · escritório</title>
+<link rel="preload" as="image" href="./entrada-larga.webp" media="(min-aspect-ratio: 8/5)">
+<link rel="preload" as="image" href="./entrada-media.webp" media="(min-aspect-ratio: 9/10) and (max-aspect-ratio: 8/5)">
+<link rel="preload" as="image" href="./entrada-alta.webp" media="(max-aspect-ratio: 9/10)">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500;700&family=Funnel+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}</script>
@@ -42,43 +45,63 @@ if (/perf/.test(location.search)) (function () {
   :root { --ink: #ece8df; --ink-60: rgba(236,232,223,.6); --line: rgba(236,232,223,.16); --dark: #141414; --blue: #1f3f9e; }
   * { box-sizing: border-box; }
   html, body { margin: 0; height: 100%; overflow: hidden; background: #141416; font-family: "Funnel Sans", system-ui, sans-serif; }
+  body { transition: background-color .7s ease; }
+  body:not(.lit) { background: #030304; transition: none; }   /* sem energia o monitor é um retângulo quase preto (o "furo" da tela mostra o fundo da página) */
   canvas#gl { position: fixed; left: 0; top: 0; display: block; width: 100vw; height: 100vh; }
-  #css3d { position: fixed; inset: 0; overflow: hidden; }
+  #css3d { position: fixed; inset: 0; overflow: hidden; transition: opacity .7s ease; }
+  body:not(.lit) #css3d { opacity: 0; transition: none; }   /* entrada: o monitor fica apagado até a energia chegar (o código põe .lit no body) */
   #css3d .screen-frame { background: #141414; border: 0; }
   #css3d iframe { display: block; width: 100%; height: 100%; border: 0; background: #141414; }
   body.hover canvas#gl { cursor: pointer; }
-  /* tela de entrada: engrenagem girando enquanto a cena carrega, as três instruções e, no fim, o botão de começar */
-  #veil { position: fixed; inset: 0; z-index: 60; display: grid; place-items: center; background: var(--dark); color: var(--ink); transition: opacity .9s ease; }
-  #veil.off { opacity: 0; pointer-events: none; }
-  #veil .vbox { width: min(460px, 100% - 48px); }
-  #lang { display: flex; justify-content: center; align-items: center; gap: 6px; margin-top: 6px; font-size: 14px; color: var(--ink-60); }
-  #lang i { width: 1px; height: 14px; background: var(--line); }
+  /* tela de entrada (inspirada no bruno-simon.com). O que aparece até a pessoa ligar a energia é só um render escuro da oficina (#vstill, arquivo .webp), o anel de progresso no centro e as instruções embaixo;
+     a cena 3D já roda por trás, escura e igual ao render. Pronto: o anel vira o botão de ligar. Ao ligar (clique, toque, Enter ou espaço), o render some em 0,3 s e a energia chega na cena de verdade.
+     O render foi capturado da própria cena, em 21:9 (câmera de campo vertical fixo), então em telas largas o recorte pela altura coincide com a cena; em celular em pé vale o render alto. */
+  #veil { position: fixed; inset: 0; z-index: 60; color: var(--ink); --rs: 112px; }   /* sem fundo próprio: o #vstill (com cor de reserva) cobre a cena e, ao sumir, deixa ver a luz acendendo */
+  #veil.off { pointer-events: none; visibility: hidden; transition: visibility 0s linear .6s; }
+  #vstill { position: absolute; inset: 0; background: #0b0b0d url(./entrada-larga.webp) center / cover no-repeat; transition: opacity .3s ease; }
+  /* três renders, um por "família" de câmera da cena (ver resize()): larga (campo vertical fixo, de 8:5 a 7:3), média (campo vertical que cresce, de 9:10 a 8:5) e alta (celular em pé). Cada um é recortado pela altura ou pela largura, conforme o que a câmera mantém fixo */
+  @media (min-aspect-ratio: 9/10) and (max-aspect-ratio: 8/5) { #vstill { background-image: url(./entrada-media.webp); background-size: auto 100%; } }
+  @media (min-aspect-ratio: 11/10) and (max-aspect-ratio: 8/5) { #vstill { background-size: 100% auto; } }
+  @media (min-aspect-ratio: 8/5) and (max-aspect-ratio: 7/3) { #vstill { background-image: url(./entrada-larga.webp); background-size: auto 100%; } }   /* depois da média: em 8:5 exato vale a larga, como no cálculo em JS */
+  @media (max-aspect-ratio: 9/10) { #vstill { background-image: url(./entrada-alta.webp); } }
+  @media (max-aspect-ratio: 9/10) and (min-aspect-ratio: 23/50) { #vstill { background-size: 100% auto; } }
+  #veil.off #vstill { opacity: 0; }
+  #veil::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 40%; background: linear-gradient(to top, rgba(8,8,10,.8), rgba(8,8,10,0)); pointer-events: none; transition: opacity .25s ease; }
+  #veil::before { content: ""; position: absolute; z-index: 1; left: 0; right: 0; top: 0; height: 110px; background: linear-gradient(to bottom, rgba(8,8,10,.75), rgba(8,8,10,0)); pointer-events: none; transition: opacity .25s ease; }   /* sombra atrás do idioma e do aviso de beta, que ficam sobre quadros claros */
+  .vsteps, #vpower, #vmsg, .vcorner { z-index: 1; transition: opacity .25s ease; }
+  #veil.off::before, #veil.off::after, #veil.off .vsteps, #veil.off #vpower, #veil.off #vmsg, #veil.off .vcorner { opacity: 0; }
   #veil.ready:not(.off) { cursor: pointer; }
-  #lang { cursor: default; }
-  #vnote { margin: 14px 0 0; text-align: center; font-size: 12px; line-height: 1.4; color: var(--ink-60); opacity: .75; }
+  #vpower { position: absolute; left: 50%; top: 50%; width: var(--rs); height: var(--rs); margin: calc(var(--rs) / -2) 0 0 calc(var(--rs) / -2); padding: 0; border: 0; border-radius: 50%; background: transparent; color: #f6dc9a; cursor: inherit; -webkit-tap-highlight-color: transparent; }
+  #vpower svg { position: absolute; left: 0; top: 0; width: 100%; height: 100%; }
+  #vpower .ring circle { fill: none; stroke: currentColor; stroke-width: 2.5; }
+  #vpower .bg { stroke-opacity: .18; }
+  #vpower .fg { stroke-linecap: round; stroke-dasharray: 289; stroke-dashoffset: 289; transform: rotate(-90deg); transform-origin: 50% 50%; transition: stroke-dashoffset .35s ease; }
+  #vpower .icon { left: 30%; top: 30%; width: 40%; height: 40%; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; opacity: 0; transform: scale(.8); transition: opacity .45s ease, transform .45s ease; }
+  #veil.ready #vpower .icon { opacity: 1; transform: none; }
+  #veil.ready #vpower .ring { animation: vpulse 1.6s ease-in-out infinite; }
+  #veil.ready #vpower:hover .ring { animation: none; }
+  #vpower:focus-visible { outline: 2px solid var(--ink); outline-offset: 6px; }
+  #vmsg { position: absolute; left: 0; right: 0; top: calc(50% + var(--rs) / 2 + 18px); margin: 0; text-align: center; font-size: 15px; font-weight: 500; color: var(--ink-60); transition: color .4s ease, opacity .25s ease; }
+  #veil.ready #vmsg { color: #f6dc9a; }
+  .vsteps { position: absolute; left: 50%; bottom: calc(28px + env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(940px, 100% - 48px); margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+  .vsteps li { display: flex; flex-direction: column; gap: 6px; padding-top: 12px; border-top: 1px solid var(--line); opacity: 0; transform: translateY(12px); animation: rise .7s cubic-bezier(.2,.7,.2,1) forwards; }
+  .vsteps li:nth-child(2) { animation-delay: .12s; } .vsteps li:nth-child(3) { animation-delay: .24s; }
+  .vsteps span { font-size: 13px; font-weight: 500; color: var(--ink-60); font-variant-numeric: tabular-nums; }
+  .vsteps b { font-size: 20px; line-height: 1.2; font-weight: 500; letter-spacing: -.03em; }
+  @media (max-aspect-ratio: 9/10), (max-width: 700px) { .vsteps { grid-template-columns: 1fr; gap: 0; bottom: calc(24px + env(safe-area-inset-bottom)); } .vsteps li { flex-direction: row; align-items: baseline; gap: 12px; padding: 10px 0; } .vsteps li:last-child { border-bottom: 1px solid var(--line); } .vsteps b { font-size: 16px; } }
+  @media (max-height: 460px) { #veil { --rs: 80px; } .vsteps { bottom: 12px; gap: 20px; } .vsteps li { padding-top: 8px; } .vsteps b { font-size: 15px; } #vmsg { font-size: 13px; top: calc(50% + var(--rs) / 2 + 12px); } }
+  @keyframes vpulse { 0%, 100% { opacity: .4; } 50% { opacity: 1; } }
+  .vcorner { position: absolute; top: 10px; right: 16px; display: flex; flex-direction: column; align-items: flex-end; cursor: default; }
+  #lang { display: flex; justify-content: center; align-items: center; gap: 6px; font-size: 14px; color: var(--ink-60); }
+  #lang i { width: 1px; height: 14px; background: var(--line); }
   #lang button { font: inherit; letter-spacing: -.01em; color: var(--ink-60); background: none; border: 0; padding: 8px 4px; cursor: pointer; }
   #lang button[aria-pressed="true"] { color: var(--ink); text-decoration: underline; text-underline-offset: 4px; }
   #lang button:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
-  .vstatus { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 500; color: var(--ink-60); }
-  .vstatus .gear { width: 20px; height: 20px; color: var(--ink); animation: turn 2.4s linear infinite; }
-  #veil.ready .vstatus .gear { animation: none; }
-  @keyframes turn { to { transform: rotate(360deg); } }
-  .vsteps { list-style: none; margin: 28px 0 0; padding: 0; }
-  .vsteps li { display: flex; align-items: baseline; gap: 14px; padding: 14px 0; border-top: 1px solid var(--line); opacity: 0; transform: translateY(12px); animation: rise .7s cubic-bezier(.2,.7,.2,1) forwards; }
-  .vsteps li:nth-child(2) { animation-delay: .12s; } .vsteps li:nth-child(3) { animation-delay: .24s; border-bottom: 1px solid var(--line); }
-  .vsteps span { font-size: 13px; font-weight: 500; color: var(--ink-60); font-variant-numeric: tabular-nums; }
-  .vsteps b { font-size: 22px; line-height: 1.15; font-weight: 500; letter-spacing: -.03em; }
-  .vfoot { height: 48px; margin-top: 28px; display: flex; align-items: center; }
-  .vbar { position: relative; width: 100%; height: 1px; background: var(--line); overflow: hidden; }
-  .vbar::after { content: ""; position: absolute; inset: 0; width: 30%; background: var(--ink); animation: slide 1.6s cubic-bezier(.5,0,.5,1) infinite; }
-  @keyframes slide { from { transform: translateX(-100%); } to { transform: translateX(334%); } }
-  #veil.ready .vbar { display: none; }
-  #veil #vgo { width: 100%; padding: 14px 22px; animation: rise .6s cubic-bezier(.2,.7,.2,1) backwards; }
-  #vgo[hidden] { display: none; }
+  #vnote { margin: 0; max-width: 240px; text-align: right; font-size: 12px; line-height: 1.4; color: var(--ink-60); opacity: .75; }
   body.focus canvas#gl { cursor: grab; } body.focus.nodrag canvas#gl { cursor: default; } body.dragging canvas#gl { cursor: grabbing; }
 
   /* caixa de texto do projeto: escura, letras creme, na linguagem do site; os elementos sobem um depois do outro */
-  #card { position: fixed; right: max(32px, 7vw); top: 50%; width: 360px; transform: translateY(-50%); padding: 28px 28px 24px; color: var(--ink); background: rgba(20,20,20,.92); border: 1px solid var(--line); border-radius: 4px; box-shadow: 0 24px 60px rgba(0,0,0,.45); opacity: 0; pointer-events: none; transition: opacity .3s; }
+  #card { position: fixed; right: max(32px, 7vw); top: 50%; width: 360px; transform: translateY(-50%); padding: 28px 28px 24px; color: var(--ink); background: rgba(20,20,20,.92); border: 1px solid var(--line); border-radius: 4px; box-shadow: 0 24px 60px rgba(0,0,0,.45); opacity: 0; pointer-events: none; transition: opacity .6s; }
   #card.show { opacity: 1; pointer-events: auto; }
   #card > * { opacity: 0; transform: translateY(16px); }
   #card.show > * { animation: rise .7s cubic-bezier(.2,.7,.2,1) forwards; }
@@ -122,34 +145,40 @@ if (/perf/.test(location.search)) (function () {
 </div>
 <div id="site" aria-hidden="true"></div>
 <div id="free"><b>câmera livre</b> · botão do meio move · Shift + botão do meio gira · rodinha aproxima · H volta ao início · F ou Esc sai<br><code class="xyz"></code></div>
-<div id="veil"><div class="vbox">
-  <div class="vstatus"><svg class="gear" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9.5" fill="none" stroke="currentColor" stroke-width="3" stroke-dasharray="3.73 3.73"/><circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="4"/></svg><span id="vmsg"></span></div>
+<div id="veil">
+  <div id="vstill"></div>
+  <button id="vpower" type="button" aria-disabled="true">
+    <svg class="ring" viewBox="0 0 100 100" aria-hidden="true"><circle class="bg" cx="50" cy="50" r="46"/><circle class="fg" cx="50" cy="50" r="46"/></svg>
+    <svg class="icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 6a7.75 7.75 0 1 0 10 0"/><path d="M12 4v8"/></svg>
+  </button>
+  <p id="vmsg" role="status"></p>
   <ol class="vsteps">
     <li><span>01</span><b data-k="s1"></b></li>
     <li><span>02</span><b data-k="s2"></b></li>
     <li><span>03</span><b data-k="s3"></b></li>
   </ol>
-  <div class="vfoot"><div class="vbar"></div><button id="vgo" type="button" hidden data-k="go"></button></div>
-  <div id="lang" role="group" aria-label="Idioma / Language"><button type="button" data-l="pt" aria-pressed="false">Português</button><i aria-hidden="true"></i><button type="button" data-l="en" aria-pressed="false">English</button></div>
-  <p id="vnote"></p>
-</div></div>
+  <div class="vcorner">
+    <div id="lang" role="group" aria-label="Idioma / Language"><button type="button" data-l="pt" aria-pressed="false">Português</button><i aria-hidden="true"></i><button type="button" data-l="en" aria-pressed="false">English</button></div>
+    <p id="vnote"></p>
+  </div>
+</div>
 <script>
-// Tela de entrada. O escritório começa a carregar na hora, por trás dela. Quando a cena fica pronta, aparece o botão de começar.
+// Tela de entrada. O escritório começa a carregar na hora, por trás dela; o anel em volta da luminária mostra o progresso. Quando a cena fica pronta, qualquer clique, toque, Enter ou espaço liga a energia.
 // Celular: o sensor de movimento é pedido sozinho já no carregamento; onde o sistema exige um toque antes (iPhone, regra da Apple), o toque em "começar" faz o pedido.
 (() => {
-  const D = window.DeviceMotionEvent, veil = document.getElementById('veil'), msg = document.getElementById('vmsg'), btn = document.getElementById('vgo');
+  const D = window.DeviceMotionEvent, veil = document.getElementById('veil'), msg = document.getElementById('vmsg'), btn = document.getElementById('vpower');
   const coarse = matchMedia('(pointer: coarse)').matches, ask = !!(D && typeof D.requestPermission === 'function') && coarse;
   // idioma: o que a pessoa escolheu antes; senão, o do navegador (português ou inglês)
   const TXT = {
-    pt: { loading: 'montando a oficina…', ready: 'oficina pronta', s1m: 'mova o mouse para olhar em volta', s1t: 'incline o celular para olhar em volta', s2m: 'clique nos objetos para ver os projetos', s2t: 'toque nos objetos para ver os projetos', s3m: 'clique no monitor para abrir o portfólio', s3t: 'toque no monitor para abrir o portfólio', gom: 'clique para começar', got: 'toque para começar', view: 'ver projeto', next: 'próximo projeto', spin: 'arraste para girar', orbit: 'arraste para girar em volta', back: 'voltar para a oficina', frame: 'Portfólio de Felipe Collucci', beta: 'site em beta · usa ferramentas que medem o desempenho de forma anônima' },
-    en: { loading: 'building the workshop…', ready: 'workshop ready', s1m: 'move the mouse to look around', s1t: 'tilt your phone to look around', s2m: 'click the objects to see the projects', s2t: 'tap the objects to see the projects', s3m: 'click the monitor to open the portfolio', s3t: 'tap the monitor to open the portfolio', gom: 'click to start', got: 'tap to start', view: 'view project', next: 'next project', spin: 'drag to rotate', orbit: 'drag to look around', back: 'back to the workshop', frame: 'Felipe Collucci\'s portfolio', beta: 'beta site · uses tools that measure performance anonymously' },
+    pt: { loading: 'arrumando a bancada…', ready: 'oficina pronta', s1m: 'mova o mouse para olhar em volta', s1t: 'incline o celular para olhar em volta', s2m: 'clique nos objetos para conhecer os projetos', s2t: 'toque nos objetos para conhecer os projetos', s3m: 'clique no monitor para entrar no portfólio', s3t: 'toque no monitor para entrar no portfólio', gom: 'ligar o portfólio', got: 'ligar o portfólio', view: 'ver mais', next: 'próximo projeto', spin: 'arraste para girar', orbit: 'arraste para girar', back: 'voltar para a oficina', frame: 'Portfólio de Felipe Collucci', beta: 'site em beta · medimos o desempenho de forma anônima' },
+    en: { loading: 'setting up the workbench…', ready: 'workshop ready', s1m: 'move the mouse to look around', s1t: 'tilt your phone to look around', s2m: 'click the objects to explore the projects', s2t: 'tap the objects to explore the projects', s3m: 'click the monitor to enter the portfolio', s3t: 'tap the monitor to enter the portfolio', gom: 'turn on the portfolio', got: 'turn on the portfolio', view: 'see more', next: 'next project', spin: 'drag to rotate', orbit: 'drag to rotate', back: 'back to the workshop', frame: 'Felipe Collucci\'s portfolio', beta: 'beta site · we measure performance anonymously' },
   };
   let saved = null; try { saved = localStorage.getItem('lang'); } catch (e) {}
   const I = window.__i18n = { lang: saved === 'pt' || saved === 'en' ? saved : ((navigator.language || '').toLowerCase().startsWith('pt') ? 'pt' : 'en'), TXT, subs: [], t: (k) => TXT[I.lang][k], on: (fn) => I.subs.push(fn) };
   const paint = () => {
     const L = TXT[I.lang], k = coarse ? 't' : 'm';
     document.documentElement.lang = I.lang === 'pt' ? 'pt-BR' : 'en';
-    msg.textContent = veil.classList.contains('ready') ? L.ready : L.loading;
+    msg.textContent = btn.ariaLabel = veil.classList.contains('ready') ? L['go' + k] : L.loading;
     document.getElementById('vnote').textContent = L.beta;
     veil.querySelectorAll('[data-k]').forEach((el) => { const d = el.dataset.k; el.textContent = d === 'go' ? L['go' + k] : L[d + k]; });
     veil.querySelectorAll('#lang button').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.l === I.lang)));
@@ -158,13 +187,30 @@ if (/perf/.test(location.search)) (function () {
   paint();
   const v = window.__veil = { loaded: false, started: false, tilt: null, onStart: null };
   const got = (s) => { v.tilt = s; };
-  v.done = () => { v.loaded = true; veil.classList.add('ready'); paint(); btn.hidden = false; if (/perf/.test(location.search) && /bateria/.test(location.search)) { v.started = true; veil.classList.add('off'); } };   // ?perf&bateria: pula a tela de entrada (sem as dicas animadas, para não mexer na medição)
+  // anel de progresso: progress(0..1) enche o anel no centro da tela (a cena chama a cada etapa montada)
+  const fg = btn.querySelector('.fg'), still = document.getElementById('vstill');
+  v.progress = (p) => { fg.style.strokeDashoffset = (289 * (1 - Math.max(0, Math.min(1, p)))).toFixed(1); };
+  if (/perf|export/.test(location.search)) still.style.display = 'none';   // com ?perf e ?export a cena já nasce acesa: o render escuro não combinaria
+  // posição exata do render: em tela larga a câmera da cena tem campo vertical fixo (de 8:5 em diante) ou que cresce conforme a tela fica mais quadrada (mesma conta de resize() na cena: manter igual). Os renders foram capturados em 21:9 / campo 40° (larga) e 1,103:1 / campo 58° (média);
+  // como recortar o centro de uma imagem retilínea equivale a um campo menor, dá para calcular o tamanho que faz o render coincidir com a cena. Fora disso (celular em pé, tela mais larga que 21:9) vale o CSS.
+  const rad = Math.PI / 360;
+  const placeStill = () => {
+    const W = innerWidth, H = innerHeight, a = W / H;
+    if (a < 0.9) { still.style.backgroundSize = ''; return; }
+    const wide = a >= 1.6, t0 = Math.tan((wide ? 40 : 58) * rad), tv = Math.tan((a < 1.6 ? 40 * Math.min(1.45, 1.6 / a) : 40) * rad);
+    const dh = H * t0 / tv, dw = dh * (wide ? 2520 / 1080 : 1654 / 1500);
+    still.style.backgroundSize = dw >= W - 0.5 && dh >= H - 0.5 ? dw.toFixed(1) + 'px ' + dh.toFixed(1) + 'px' : 'cover';
+  };
+  addEventListener('resize', placeStill); placeStill();
+  v.progress(0.05);
+  v.done = () => { v.loaded = true; v.progress(1); veil.classList.add('ready'); btn.removeAttribute('aria-disabled'); paint(); if (/perf/.test(location.search) && /bateria/.test(location.search)) { v.started = true; veil.classList.add('off'); } };   // ?perf&bateria: pula a tela de entrada (sem as dicas animadas, para não mexer na medição)
   const start = () => {
     if (!v.loaded || v.started) return;
     if (ask && v.tilt !== 'granted') D.requestPermission().then(got).catch(() => got('denied'));
     v.started = true; veil.classList.add('off'); if (v.onStart) v.onStart();
   };
-  veil.addEventListener('click', (e) => { if (!e.target.closest('#lang')) start(); });   // qualquer toque na tela começa, menos no seletor de idioma
+  veil.addEventListener('click', (e) => { if (!e.target.closest('.vcorner')) start(); });   // qualquer toque na tela liga a energia e começa, menos no canto do idioma
+  addEventListener('keydown', (e) => { if ((e.key === 'Enter' || e.key === ' ') && !e.target.closest('.vcorner')) start(); });
   if (ask) D.requestPermission().then(got).catch(() => {});
 })();
 </script>
@@ -737,20 +783,28 @@ import { CSS3DRenderer, CSS3DObject } from 'three/addons/renderers/CSS3DRenderer
 const T0 = { modulo: performance.now() };   // marcas de tempo (ms desde que a página foi pedida) para o painel ?perf: aqui o motor 3D já chegou e o código começa a rodar
 const PERF = !!window.__perf, perfStep = (name) => window.__perf.step(name);   // com ?perf, cada etapa da cena registra o tempo e deixa o painel atualizar
 if (PERF) window.__perf.event('modulo');
+// progresso da entrada: cada etapa da cena avança o anel; a cada 3 etapas a montagem cede a vez para a tela pintar (com ?perf vale o passo do painel)
+let stepN = 0;
+const STEPS = 28, stepDone = (name) => {
+  if (PERF) return perfStep(name);
+  stepN++; window.__veil.progress(0.15 + 0.7 * Math.min(1, stepN / STEPS));
+  if (stepN % 3 === 0) return new Promise((r) => setTimeout(r, 0));
+};
+window.__veil.progress(0.12);
 
 // ===================== CONTEÚDO (vem de Profissional/perfil.md) =====================
 const I18N = window.__i18n;
 const PROJECTS = {
-  drone: { title: 'Drone autônomo', meta: ['Sapienza Flight Team', 'C-UASC 2026'], desc: 'Drone para missões totalmente autônomas na competição C-UASC 2026, na Califórnia. Fiz a modelagem estrutural: fuselagem, trens de pouso e sistemas de carga. 1º lugar na Aircraft Design Competition.' },
+  drone: { title: 'Drone autônomo', meta: ['Design de engenharia', 'Sapienza, Roma'], desc: 'Drone para missões totalmente autônomas na competição C-UASC 2026, na Califórnia: navegar pela arena, localizar alvos e liberar cargas contra o relógio. A modelagem estrutural cobre fuselagem, trens de pouso e sistemas de carga. 1º lugar na Aircraft Design Competition.' },
   bike:  { title: 'Bicicletário Arcus', meta: ['Design de produto', 'Sapienza, Roma'], desc: 'Bicicletário modular semi-vertical para espaços urbanos compactos. Uma calha curva apoia as rodas, e a bicicleta sobe com pouco esforço até travar. Estrutura em chapas de aço cortadas e soldadas.' },
-  robo:  { title: 'Robôs de combate', meta: ['UERJBotz', 'desde 2024'], desc: 'Lidero os robôs de combate da UERJBotz, da ideia à modelagem e à manufatura. Em 2024 a equipe ficou com 1º, 2º e 3º lugar na categoria de 150 g do CCBB Robotics Challenge.' },
+  robo:  { title: 'Robôs de combate', meta: ['Design de engenharia', 'UERJ, Rio de Janeiro'], desc: 'Robôs de combate de 150 g a 1.360 g, projetados para maior impacto e durabilidade e para serem reconstruídos rapidamente entre as lutas. O trabalho vai da ideia à modelagem e à manufatura. Em 2024, a equipe ficou com 1º, 2º e 3º lugar na categoria de 150 g do CCBB Robotics Challenge.' },
   toddy: { title: 'Toddy', meta: ['Design gráfico', 'ESDI / UERJ'], desc: 'Proposta de redesign da embalagem e da comunicação visual do achocolatado Toddy. O desafio foi trazer um ar minimalista sem destoar de um produto já consolidado no Brasil.' },
 };
 // os modelos dos projetos são os do visualizador (projects/*.js), sem alteração
 const PROJECTS_EN = {
-  drone: { title: 'Autonomous drone', meta: ['Sapienza Flight Team', 'C-UASC 2026'], desc: 'Drone for fully autonomous missions at the C-UASC 2026 competition, in California. I did the structural modeling: fuselage, landing gear and payload systems. 1st place in the Aircraft Design Competition.' },
+  drone: { title: 'Autonomous drone', meta: ['Engineering design', 'Sapienza, Rome'], desc: 'Drone for fully autonomous missions at the C-UASC 2026 competition, in California: navigating the arena, locating targets and releasing payloads against the clock. The structural modeling covers fuselage, landing gear and payload systems. 1st place in the Aircraft Design Competition.' },
   bike:  { title: 'Arcus bike rack', meta: ['Product design', 'Sapienza, Rome'], desc: 'Modular semi-vertical bike rack for compact urban spaces. A curved rail supports the wheels, and the bike goes up with little effort until it locks in place. Structure made of cut and welded steel plates.' },
-  robo:  { title: 'Combat robots', meta: ['UERJBotz', 'since 2024'], desc: 'I lead the UERJBotz combat robots, from the idea to modeling and manufacturing. In 2024 the team took 1st, 2nd and 3rd place in the 150 g class at the CCBB Robotics Challenge.' },
+  robo:  { title: 'Combat robots', meta: ['Engineering design', 'UERJ, Rio de Janeiro'], desc: 'Combat robots from 150 g to 1,360 g (3 lb), designed for greater impact and durability and to be rebuilt quickly between fights. The work goes from the idea to modeling and manufacturing. In 2024, the team took 1st, 2nd and 3rd place in the 150 g class at the CCBB Robotics Challenge.' },
   toddy: { title: 'Toddy', meta: ['Graphic design', 'ESDI / UERJ'], desc: 'Redesign proposal for the packaging and visual communication of Toddy chocolate drink. The challenge was to bring a minimalist look without clashing with a product already established in Brazil.' },
 };
 const proj = (id) => (I18N.lang === 'en' ? PROJECTS_EN : PROJECTS)[id];
@@ -848,14 +902,14 @@ if (Q.luzesMin) scene.remove(lampLight, lampLight.target, glow, focusLight);
 const room = group(scene);
 // seções do ambiente (para a exportação ao Blender): cada mark() abre uma seção com os objetos criados depois dele
 const SECTIONS = [], mark = (name) => SECTIONS.push([name, room.children.length]);
-mark('Parede e mesa'); if (PERF) await perfStep('Parede e mesa');
+mark('Parede e mesa'); await stepDone('Parede e mesa');
 add(new THREE.PlaneGeometry(4.2, 2.6), mat(0xffffff, { map: wallTex, roughness: 0.9, envMapIntensity: 0.15 }), room, 0, 1.3, -0.47);
 // mesa de nogueira com borda arredondada
 rbox(2.6, 0.045, 0.8, 0.012, walnutM, room, 0, 0.7175, -0.08, 4);
 // (a frente da mesa agora é aberta, com gaveteiros e PC embaixo: veja a seção "Chão e embaixo da mesa")
 
 // ---------- pegboard metálico com ferramentas ----------
-mark('Pegboard'); if (PERF) await perfStep('Pegboard');
+mark('Pegboard'); await stepDone('Pegboard');
 const DROP = 0.02;   // o pegboard e tudo que está preso nele foi abaixado 2 cm (valor negativo = sobe)
 const PB = { w: 0.86, h: 0.48, y: 1.29 - DROP, z: -0.44 };
 rbox(PB.w, PB.h, 0.012, 0.01, mat(C.board, { roughness: 0.6, metalness: 0.3 }), room, 0, PB.y, PB.z);
@@ -906,7 +960,7 @@ driverRack(1.512); [C.toolBlue, C.toolBlue, C.red, C.yellow, C.yellow].forEach((
 driverRack(1.382); [0, 1, 2, 3, 4].forEach((i) => driver(0.165 + i * 0.035, 1.34, C.dark, C.red));
 
 // ---------- prateleiras de nogueira com mãos-francesas pretas ----------
-mark('Prateleiras'); if (PERF) await perfStep('Prateleiras');
+mark('Prateleiras'); await stepDone('Prateleiras');
 const shelf = (x, y) => {
   rbox(0.56, 0.024, 0.2, 0.005, shelfM, room, x, y, -0.36, 3);
   [-0.2, 0.2].forEach((dx) => { const b = mat(C.bracket, { metalness: 0.4, roughness: 0.5 });
@@ -987,7 +1041,7 @@ rbox(0.065, 0.27, 0.02, 0.008, mat(C.graphite, { roughness: 0.4, metalness: 0.4 
 tube([[0.0, 0.8, SCREEN.z - 0.085], [0.03, 0.76, SCREEN.z - 0.12], [0.12, 0.745, -0.43]], 0.004, mat(C.dark, { roughness: 0.6 }), room, 20, 8);
 
 // ---------- mousepad azul com costura ----------
-mark('Mousepad'); if (PERF) await perfStep('Mousepad');
+mark('Mousepad'); await stepDone('Mousepad');
 const PAD = { w: 1.06, d: 0.42, x: 0.03, z: 0.06 };
 rbox(PAD.w, 0.004, PAD.d, 0.002, mat(C.blue, { roughness: 0.92, envMapIntensity: 0.1 }), room, PAD.x, 0.742, PAD.z, 2);
 (() => { const s = new THREE.Shape(), w = PAD.w / 2 - 0.006, d = PAD.d / 2 - 0.006, r = 0.012;
@@ -996,7 +1050,7 @@ rbox(PAD.w, 0.004, PAD.d, 0.002, mat(C.blue, { roughness: 0.92, envMapIntensity:
   add(new THREE.TubeGeometry(new THREE.CatmullRomCurve3(pts, true), 320, 0.0012, 4, true), mat(0x17286f, { roughness: 1 }), room); })();
 
 // ---------- teclado de perfil baixo com layout real ----------
-mark('Teclado'); if (PERF) await perfStep('Teclado');
+mark('Teclado'); await stepDone('Teclado');
 (() => {
   const g = group(room, 0, 0.744, 0.095); g.rotation.x = 0.035;
   const U = 0.0285, gap = 0.0035;
@@ -1021,7 +1075,7 @@ mark('Teclado'); if (PERF) await perfStep('Teclado');
 })();
 
 // ---------- mouse ergonômico sem fio ----------
-mark('Mouse'); if (PERF) await perfStep('Mouse');
+mark('Mouse'); await stepDone('Mouse');
 (() => {
   const g = group(room, 0.29, 0.744, 0.205); g.rotation.y = -0.12;
   const geo = new THREE.SphereGeometry(0.034, 40, 24); const p = geo.attributes.position;
@@ -1033,7 +1087,7 @@ mark('Mouse'); if (PERF) await perfStep('Mouse');
 })();
 
 // ---------- luminária articulada com molas ----------
-mark('Luminária'); if (PERF) await perfStep('Luminária');
+mark('Luminária'); await stepDone('Luminária');
 // base no canto de trás à esquerda; o braço se estende sobre a mesa e a cúpula aponta para a área de trabalho (multímetro e solda)
 (() => {
   const B = V(-0.84, 0.742, -0.22), T = V(-0.46, 0.742, -0.05);              // base e ponto iluminado
@@ -1069,7 +1123,7 @@ mark('Luminária'); if (PERF) await perfStep('Luminária');
 })();
 
 // ---------- estação de solda (entre o teclado e o monitor, ao lado dos robôs; o ferro inclina para a esquerda, longe deles) ----------
-mark('Estação de solda'); if (PERF) await perfStep('Estação de solda');
+mark('Estação de solda'); await stepDone('Estação de solda');
 (() => {
   const g = group(room, 0.16, 0.742, -0.195); g.rotation.y = Math.PI - 0.2;
   const dk = mat(0x232428, { roughness: 0.45, metalness: 0.3 }), st = mat(C.steel, METAL);
@@ -1088,7 +1142,7 @@ mark('Estação de solda'); if (PERF) await perfStep('Estação de solda');
 })();
 
 // ---------- multímetro (capa laranja, visor, seletor, bornes, pontas de prova) ----------
-mark('Multímetro'); if (PERF) await perfStep('Multímetro');
+mark('Multímetro'); await stepDone('Multímetro');
 (() => {
   const g = group(room, -0.36, 0.742, -0.2); g.rotation.set(-0.3, 0.22, 0);
   rbox(0.09, 0.165, 0.036, 0.012, mat(0xdc7420, { roughness: 0.7 }), g, 0, 0.0825, 0);
@@ -1126,7 +1180,7 @@ mark('Multímetro'); if (PERF) await perfStep('Multímetro');
 })();
 
 // ---------- fone over-ear deitado ----------
-mark('Fone'); if (PERF) await perfStep('Fone');
+mark('Fone'); await stepDone('Fone');
 (() => {
   // dobrado e deitado, como fones de conchas giratórias: as conchas viradas para baixo e o arco deitado na mesa, atrás delas.
   // cada garfo abraça a metade de trás da concha (pinos nas laterais) e o arco sai do meio do garfo, para trás
@@ -1155,7 +1209,7 @@ mark('Fone'); if (PERF) await perfStep('Fone');
 })();
 
 // ---------- caneca de cerâmica ----------
-mark('Caneca'); if (PERF) await perfStep('Caneca');
+mark('Caneca'); await stepDone('Caneca');
 (() => {
   const g = group(room, -0.7, 0.742, -0.19); g.rotation.y = 0.35;   // ao lado da base da luminária
   const cm = mat(C.cream, { roughness: 0.3 });
@@ -1165,7 +1219,7 @@ mark('Caneca'); if (PERF) await perfStep('Caneca');
 })();
 
 // ---------- paquímetro digital ----------
-mark('Paquímetro'); if (PERF) await perfStep('Paquímetro');
+mark('Paquímetro'); await stepDone('Paquímetro');
 (() => {
   // deitado no mousepad entre o mouse e o caderno, bicos externos para trás (sem passar da borda), medindo 12,70 mm
   const g = group(room, 0.428, 0.744, 0.247); g.rotation.y = 0.02;
@@ -1196,7 +1250,7 @@ mark('Paquímetro'); if (PERF) await perfStep('Paquímetro');
 })();
 
 // ---------- impressora 3D (como a da imagem D): base, mesa móvel, pórtico de duas colunas, cabeçote e carretéis em cima ----------
-mark('Impressora 3D'); if (PERF) await perfStep('Impressora 3D');
+mark('Impressora 3D'); await stepDone('Impressora 3D');
 // tudo encaixado: as colunas nascem de sapatas na base, a viga X corre em carros nas colunas, os carretéis giram num eixo sobre a travessa
 (() => {
   const g = group(room, 0.7, 0.742, -0.16);
@@ -1278,7 +1332,7 @@ const hand = (g, text, x, y, size, col = '#26282e') => { g.font = `700 ${size}px
 const toLocal = (g, x, y, z) => g.worldToLocal(V(x, y, z)).toArray();
 
 // ---------- papéis: esquema elétrico, desenho técnico, código de cores, pinagem, lista, rascunho, post-its ----------
-mark('Papéis e post-its'); if (PERF) await perfStep('Papéis e post-its');
+mark('Papéis e post-its'); await stepDone('Papéis e post-its');
 const schematicTex = (title) => canvasTex(512, 680, (g, w, h) => {
   g.fillStyle = PAPER; g.fillRect(0, 0, w, h); lineGrid(g, w, h, 16, 'rgba(44,62,102,.09)');
   g.strokeStyle = INK; g.fillStyle = INK; g.lineWidth = 2.5; g.strokeRect(16, 16, w - 32, h - 32);
@@ -1387,7 +1441,7 @@ pinned(-0.045, 1.305 - DROP, PB.z + 0.009, 0.045, 0.045, noteTex(['ESC', 'v2 ok'
 pinned(0.035, 1.372 - DROP, PB.z + 0.009, 0.12, 0.08, pinoutTex, -0.02, C.yellow).position.x += 0;
 
 // ---------- pegboard: mais ferramentas penduradas ----------
-mark('Pegboard (extras)'); if (PERF) await perfStep('Pegboard (extras)');
+mark('Pegboard (extras)'); await stepDone('Pegboard (extras)');
 const tapeRoll = (parent, color, R = 0.025, r = 0.016, w = 0.019) => lathe([[r, -w / 2], [R, -w / 2], [R, w / 2], [r, w / 2], [r, -w / 2]], mat(color, { roughness: 0.45 }), parent, 0, 0, 0, 36);
 const solderSpool = (parent, R = 0.022) => { const g = group(parent);
   const wire = canvasTex(64, 128, (c, w, h) => { c.fillStyle = '#a6a9ae'; c.fillRect(0, 0, w, h); for (let y = 0; y < h; y += 3) { c.fillStyle = 'rgba(0,0,0,.22)'; c.fillRect(0, y, w, 1); } });
@@ -1429,7 +1483,7 @@ const ps1 = solderSpool(tools); ps1.position.set(0.05, 1.4922, 0.018); ps1.rotat
 })();
 
 // ---------- prateleiras: potes de peças, caixas ----------
-mark('Prateleiras (potes e caixas)'); if (PERF) await perfStep('Prateleiras (potes e caixas)');
+mark('Prateleiras (potes e caixas)'); await stepDone('Prateleiras (potes e caixas)');
 // caixas e componentes de eletrônica (no lugar dos potes), na prateleira de cima à esquerda
 (() => {
   const Y = 1.312, dk = mat(0x2b2f38, { roughness: 0.5 });
@@ -1496,7 +1550,7 @@ mark('Prateleiras (potes e caixas)'); if (PERF) await perfStep('Prateleiras (pot
 })();
 
 // ---------- bancada: esquema e plaquinha na terceira mão (na luz da luminária); protoboard e Arduino na frente do teclado ----------
-mark('Bancada eletrônica'); if (PERF) await perfStep('Bancada eletrônica');
+mark('Bancada eletrônica'); await stepDone('Bancada eletrônica');
 deskSheet(-0.56, -0.17, 0.148, 0.21, schematicTex('SCH-02 · SENSOR'), 0.15);
 const PCB = group(room, -0.585, 0.8, -0.225); PCB.rotation.set(0.35, 0.1, 0);
 (() => { // plaquinha de circuito presa nas garras da terceira mão
@@ -1564,7 +1618,7 @@ const PCB = group(room, -0.585, 0.8, -0.225); PCB.rotation.set(0.35, 0.1, 0);
 })();
 
 // ---------- terceira mão com lupa ----------
-mark('Terceira mão'); if (PERF) await perfStep('Terceira mão');
+mark('Terceira mão'); await stepDone('Terceira mão');
 // base pesada com dois braços flexíveis (pescoço de ganso) que seguram a placa pelas bordas, e a lupa numa haste atrás
 (() => {
   const g = group(room, -0.6, 0.742, -0.33); g.rotation.y = 0.1;
@@ -1609,7 +1663,7 @@ mark('Terceira mão'); if (PERF) await perfStep('Terceira mão');
 })();
 
 // ---------- gaveteiro de componentes ----------
-mark('Gaveteiro'); if (PERF) await perfStep('Gaveteiro');
+mark('Gaveteiro'); await stepDone('Gaveteiro');
 (() => {
   const g = group(room, -0.48, 0.742, -0.395); g.rotation.y = 0.12;
   const W = 0.13, H = 0.16, D = 0.1;
@@ -1630,7 +1684,7 @@ mark('Gaveteiro'); if (PERF) await perfStep('Gaveteiro');
 })();
 
 // ---------- fonte de bancada com osciloscópio em cima ----------
-mark('Fonte e osciloscópio'); if (PERF) await perfStep('Fonte e osciloscópio');
+mark('Fonte e osciloscópio'); await stepDone('Fonte e osciloscópio');
 (() => {
   const ps = group(room, 0.47, 0.742, -0.37); ps.rotation.y = -0.3;
   const body = mat(0x3a3c42, { roughness: 0.45, metalness: 0.3 }), dk = mat(0x1d1e22, { roughness: 0.4 });
@@ -1675,7 +1729,7 @@ mark('Fonte e osciloscópio'); if (PERF) await perfStep('Fonte e osciloscópio')
 })();
 
 // ---------- bagunça na mesa ----------
-mark('Bagunça na mesa'); if (PERF) await perfStep('Bagunça na mesa');
+mark('Bagunça na mesa'); await stepDone('Bagunça na mesa');
 (() => { // chave de fenda solta na frente do monitor
   const g = group(room, -0.13, 0.744, -0.12); g.rotation.y = 0.25;
   const h = group(g, 0, 0.0076, 0); h.rotation.z = Math.PI / 2;
@@ -1758,8 +1812,8 @@ pinned(0.52, 1.38, -0.4685, 0.07, 0.09, canvasTex(224, 288, (c, w, h) => {   // 
 // =====================================================================
 // LEDs do PC gamer: cada item é [material ou luz, deslocamento de cor]; rgbTick() gira a cor com o tempo
 const rgbLeds = [], rgbLights = [];
-const rgbTick = (t) => { const hu = (t * 0.00007) % 1; rgbLeds.forEach(([m, o]) => m.color.setHSL((hu + o) % 1, 1, 0.55)); rgbLights.forEach(([l, o]) => l.color.setHSL((hu + o) % 1, 1, 0.55)); };
-mark('Chão e embaixo da mesa'); if (PERF) await perfStep('Chão e embaixo da mesa');
+const rgbTick = (t) => { const hu = (t * 0.00007) % 1; rgbLeds.forEach(([m, o]) => m.color.setHSL((hu + o) % 1, 1, 0.55 * rgbPower)); rgbLights.forEach(([l, o]) => l.color.setHSL((hu + o) % 1, 1, 0.55 * rgbPower)); };   // rgbPower: 0 sem energia, 1 ligado (entrada)
+mark('Chão e embaixo da mesa'); await stepDone('Chão e embaixo da mesa');
 (() => {
   const dk = mat(C.walnutDark, { roughness: 0.7 }), body = mat(0x2b2c31, { roughness: 0.55, metalness: 0.15 }), front = mat(0x3a3d45, { roughness: 0.5, metalness: 0.1 }), st = mat(C.steel, METAL);
   // chão de tábuas escuras, da parede até bem à frente da mesa
@@ -1836,7 +1890,7 @@ mark('Chão e embaixo da mesa'); if (PERF) await perfStep('Chão e embaixo da me
 
 // ---------- janela de correr com persiana rolô e ar-condicionado de janela em cima, no canto direito da parede (logo depois do fim da mesa) ----------
 // fica fora da vista normal de propósito: aparece em telas bem largas e na câmera livre. Não tem luz própria (lá fora é noite), então não pesa na iluminação
-mark('Janela e ar-condicionado'); if (PERF) await perfStep('Janela e ar-condicionado');
+mark('Janela e ar-condicionado'); await stepDone('Janela e ar-condicionado');
 (() => {
   const WX = 1.72, WW = 0.62, WH = 0.9, Y0 = 1.0, YC = Y0 + WH / 2, YT = Y0 + WH;   // centro em x, largura, altura, peitoril, meio e topo do vão
   const g = group(room, WX, 0, -0.47);   // encostado na parede do fundo
@@ -1898,7 +1952,7 @@ mark('Janela e ar-condicionado'); if (PERF) await perfStep('Janela e ar-condicio
   rbox(0.045, 0.008, 0.002, 0.001, alu, g, AX - 0.1, AY0 + 0.092, AZ + 0.003, 1);
 })();
 
-mark('Parede (decoração)'); if (PERF) await perfStep('Parede (decoração)');
+mark('Parede (decoração)'); await stepDone('Parede (decoração)');
 (() => {
   const WZ = -0.4685;
 
@@ -1981,13 +2035,13 @@ const resetPose = (m) => {
   m.elapsed = 0; m.pose.forEach(([o, p, q]) => { o.position.copy(p); o.quaternion.copy(q); });
 };
 // drone na prateleira de cima à esquerda
-placeModel('drone', { fitWidth: 0.3, at: V(-0.58, 1.3125, -0.335), yaw: 0.3 }); if (PERF) await perfStep('Modelo drone');   // deslocado para a direita e um pouco para a frente, como no círculo verde
+placeModel('drone', { fitWidth: 0.3, at: V(-0.58, 1.3125, -0.335), yaw: 0.3 }); await stepDone('Modelo drone');   // deslocado para a direita e um pouco para a frente, como no círculo verde
 // a equipe (Blitzen + Killbot) em tamanho real (1 unidade = 16 mm), à direita do mouse
-placeModel('robo', { scale: 0.016, at: V(0.43, 0.744, 0.03), yaw: -0.1 }); if (PERF) await perfStep('Modelo robo');
+placeModel('robo', { scale: 0.016, at: V(0.43, 0.744, 0.03), yaw: -0.1 }); await stepDone('Modelo robo');
 // o bicicletário como miniatura na prateleira de cima à direita; a caixa cobre o percurso da bicicleta
-placeModel('bike', { fitWidth: 0.38, at: V(0.7, 1.3125, -0.37), yaw: 0.33 + Math.PI, pre: 12.95, cycle: 22 }); if (PERF) await perfStep('Modelo bike');   // ponta esquerda levemente para a frente (ângulo suave, de lado), girado 180° para a bicicleta ficar do lado direito e descer para a área livre; mais para dentro da prateleira (z -0,37 e x 0,70)
+placeModel('bike', { fitWidth: 0.38, at: V(0.7, 1.3125, -0.37), yaw: 0.33 + Math.PI, pre: 12.95, cycle: 22 }); await stepDone('Modelo bike');   // ponta esquerda levemente para a frente (ângulo suave, de lado), girado 180° para a bicicleta ficar do lado direito e descer para a área livre; mais para dentro da prateleira (z -0,37 e x 0,70)
 // o Toddy em tamanho real (1 unidade = 10 mm), jogado na mesa à esquerda e encostado na caneca, com a frente para a câmera
-placeModel('toddy', { scale: 0.01, rotX: -Math.PI / 2, at: V(-0.6, 0.742, 0.06), yaw: 0.3 }); if (PERF) await perfStep('Modelo toddy');
+placeModel('toddy', { scale: 0.01, rotX: -Math.PI / 2, at: V(-0.6, 0.742, 0.06), yaw: 0.3 }); await stepDone('Modelo toddy');
 P.toddy.built.root.traverse((o) => { if (o.material && o.material.color) { o.material.color.multiplyScalar(0.8); o.material.roughness = 0.88; o.material.metalness = 0; o.material.envMapIntensity = 0.35; if (o.material.bumpScale) o.material.bumpScale = 0.4; } });   // o branco do pacote estourava com as luzes da mesa: fosco, sem metal e com pouco reflexo do ambiente
 const TODDY_HELD = V(0, 0.125, 0);   // centro do pacote quando pego, acima do ponto onde está deitado
 P.toddy.anchor = V(0.06, TODDY_HELD.y + 0.085, 0);
@@ -2118,7 +2172,7 @@ const ease = (t) => (t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2);
 
 // ---------- estado e interação ----------
 const state = { mode: 'desk', focus: null, hover: null };
-if (/debug/.test(location.search)) window.__d = { renderer, camera, cam, HOME, P, scene, lampLight, V, state, THREE, SECTIONS, room, openFocus: (id) => openFocus(P[id].holder), openScreen };
+if (/debug/.test(location.search)) window.__d = { get frame() { return frame; }, renderer, camera, cam, HOME, P, scene, lampLight, V, state, THREE, SECTIONS, room, openFocus: (id) => openFocus(P[id].holder), openScreen };
 const ray = new THREE.Raycaster();
 const overScreen = (e) => {
   ray.setFromCamera(new THREE.Vector2((e.clientX / W) * 2 - 1, -(e.clientY / H) * 2 + 1), camera);
@@ -2181,7 +2235,7 @@ const tag = document.getElementById('card'), site = document.getElementById('sit
 const FOCUS = { drone: { up: 0.25, dist: 1.5, drag: 'spin' }, bike: { up: 0.2, dist: 1.25, drag: 'none' }, robo: { up: 0.55, dist: 1.6, drag: 'orbit' }, toddy: { up: 0.7, dist: 1.7, drag: 'spin' } };
 let orbit = null;   // câmera em órbita no destaque: { c, R, el0, az, el, azT, elT }
 function openFocus(g) {
-  const id = g.userData.id, m = P[id], F = FOCUS[id];
+  const id = g.userData.id, m = P[id], F = FOCUS[id], MS = state.mode === 'focus' ? 1800 : 950;   // trocar de um projeto para o próximo é mais lento (a câmera voa devagar entre eles)
   state.mode = 'focus'; state.focus = g; setHover(null); document.body.classList.add('away', 'focus'); document.body.classList.toggle('nodrag', F.drag === 'none'); noteOpened(); orbit = null;
   // celular em pé: o objeto fica centralizado e no alto da tela (ocupando ~80% da largura) e a etiqueta vai embaixo; "lift" sobe o objeto no quadro sem mudar o ângulo da câmera
   const narrow = isNarrow(), tf = Math.tan((camera.fov * Math.PI) / 360);
@@ -2191,12 +2245,12 @@ function openFocus(g) {
   if (id === 'toddy') { // o pacote é pego e fica em pé: a câmera para de frente para ele, um pouco acima, com a etiqueta à direita (ou embaixo, no celular)
     const C = m.at.clone().add(TODDY_HELD), fw = V(Math.sin(m.yaw), 0, Math.cos(m.yaw)), rt = V(Math.cos(m.yaw), 0, -Math.sin(m.yaw));
     if (narrow) { const td = Math.max(0.35, 0.0735 / (tf * camera.aspect)), tl = 0.4 * td * tf;
-      flyTo(C.clone().addScaledVector(fw, td).add(V(0, 0.035 - tl, 0)), C.clone().add(V(0, -tl, 0)), 950, () => showTag(g)); }
-    else flyTo(C.clone().addScaledVector(fw, 0.44).add(V(0, 0.035, 0)), C.clone().addScaledVector(rt, 0.08), 950, () => showTag(g));
+      flyTo(C.clone().addScaledVector(fw, td).add(V(0, 0.035 - tl, 0)), C.clone().add(V(0, -tl, 0)), MS, () => showTag(g)); }
+    else flyTo(C.clone().addScaledVector(fw, 0.44).add(V(0, 0.035, 0)), C.clone().addScaledVector(rt, 0.08), MS, () => showTag(g));
     placeFocusLight(g); return;
   }
   const from0 = c.clone().add(V(0, d * F.up * 0.45, d)), from = from0.clone().add(V(0, -lift, 0));
-  flyTo(from, c.clone().add(V(narrow ? 0 : r * 0.42, -lift, 0)), 950, () => { showTag(g); if (F.drag === 'orbit') { const o = from0.clone().sub(c); orbit = { c, side: narrow ? 0 : r * 0.42, lift, R: o.length(), el0: Math.asin(o.y / o.length()), az: 0, el: 0, azT: 0, elT: 0 }; } });
+  flyTo(from, c.clone().add(V(narrow ? 0 : r * 0.42, -lift, 0)), MS, () => { showTag(g); if (F.drag === 'orbit') { const o = from0.clone().sub(c); orbit = { c, side: narrow ? 0 : r * 0.42, lift, R: o.length(), el0: Math.asin(o.y / o.length()), az: 0, el: 0, azT: 0, elT: 0 }; } });
   placeFocusLight(g);
 }
 function showTag(g) {
@@ -2375,15 +2429,15 @@ canvas.addEventListener('wheel', (e) => {
 const f3 = (v) => `${v.x.toFixed(3)}, ${v.y.toFixed(3)}, ${v.z.toFixed(3)}`;
 const freeReadout = () => { if (state.mode === 'free') freeXYZ.textContent = `pos V(${f3(cam.pos)})  ·  look V(${f3(cam.look)})`; };
 
-// ---------- brilho de entrada: os objetos clicáveis clareiam um a um (ao entrar, e uma vez mais se a pessoa ficar 15 s sem abrir nada) ----------
+// ---------- brilho de entrada: os objetos clicáveis clareiam um a um (ao entrar e, se a pessoa ficar parada, de novo a cada 15 s ou 30 s) ----------
 const PULSE_GAIN = 0.2;
 const pulses = [];
 const pulseMats = (g) => { const set = new Set(); g.traverse((o) => { (Array.isArray(o.material) ? o.material : [o.material]).forEach((m) => { if (m && m.emissive && m.emissive.getHex() === 0 && !m.emissiveMap) set.add(m); }); }); return [...set]; };
-function hintObjects() {
+function hintObjects(only) {   // only: lista de objetos a piscar (sem ela, todos os clicáveis)
   if (state.mode !== 'desk' || pulses.length) return;
   const now = performance.now();
-  const order = [...clickables].sort(() => Math.random() - 0.5); let at = now;   // ordem sorteada, com intervalos diferentes entre um e outro
-  order.forEach((g) => { pulses.push({ g, mats: g.userData.pm || (g.userData.pm = pulseMats(g)), t0: at }); at += 250 + Math.random() * 700; });
+  const order = [...(only || clickables)].sort(() => Math.random() - 0.5); let at = now;   // ordem sorteada, com intervalo fixo entre um e outro
+  order.forEach((g) => { pulses.push({ g, mats: g.userData.pm || (g.userData.pm = pulseMats(g)), t0: at }); at += 1500; });   // um brilho começa a cada 1,5 s (cada um dura 1,1 s)
 }
 function pulseTick(t) {
   for (let i = pulses.length - 1; i >= 0; i--) {
@@ -2394,9 +2448,11 @@ function pulseTick(t) {
     if (k >= 1) pulses.splice(i, 1);
   }
 }
+// enquanto a pessoa nunca abriu um projeto, a série completa se repete a cada 15 s; depois que ela abre algum, a cada 15 s sem clicar um projeto sorteado (o monitor não entra) pisca sozinho
 let idleT = null, opened = false;
-const noteOpened = () => { opened = true; clearTimeout(idleT); };
-window.__veil.onStart = () => { setTimeout(hintObjects, 3000); idleT = setTimeout(() => { if (!opened) hintObjects(); }, 16000); };
+const scheduleHint = (ms) => { clearTimeout(idleT); idleT = setTimeout(() => { if (opened) hintObjects([clickables.filter((g) => g !== monitor)[Math.floor(Math.random() * (clickables.length - 1))]]); else hintObjects(); scheduleHint(15000); }, ms); };
+const noteOpened = () => { opened = true; scheduleHint(15000); };
+window.__veil.onStart = () => { setTimeout(hintObjects, 3000); scheduleHint(15000); };
 if (/debug/.test(location.search)) window.__hint = hintObjects;
 
 // ---------- animações: as do próprio modelo, ligadas no hover/foco ----------
@@ -2439,7 +2495,7 @@ function animate(dt, t) {
     m.holder.rotation.set(s.pitch, m.yaw + s.yaw, 0);
     const c = V(0, s.cy, 0); m.holder.position.copy(m.at).add(c).sub(c.applyEuler(m.holder.rotation));
   }
-  focusLight.intensity += ((focusLight.userData.target || 0) - focusLight.intensity) * Math.min(1, dt * 5);
+  focusLight.intensity += ((focusLight.userData.target || 0) - focusLight.intensity) * Math.min(1, dt * 2.5);
   // sombras: só os projetos se mexem (animação, levantar, girar no arraste); parado, o mapa de sombra antigo continua valendo
   // o projeto aberto/em hover só conta como movimento se a pose mudou desde o quadro anterior (parado, não refaz sombra)
   let moving = toddyHeld > 0.002 && toddyHeld < 0.998;   // pego e parado não é movimento; só a subida e a descida (awake segue a mesma regra, abaixo)
@@ -2600,6 +2656,58 @@ const perf = /perf/.test(location.search) ? (() => {
   };
 })() : null;
 
+// ---------- entrada: a oficina começa sem energia e ela chega quando a pessoa começa ----------
+// Sem energia: só o abajur está aceso (luz e brilho da cúpula compensam a exposição baixa, então ele parece sempre igual). O resto fica quase apagado: luzes gerais e reflexos do ambiente (envMapIntensity) em POWER_DARK / ENV_DARK,
+// e tudo o que brilha sozinho (visores do multímetro, da fonte, do osciloscópio e da impressora, LEDs e a fita sob a mesa, materiais sem iluminação) apagado.
+// Ao começar (~2 s): a luz geral e os reflexos sobem, o monitor liga e os aparelhos acendem um depois do outro, e a câmera sai de INTRO_OFF (20 cm atrás e 5 cm acima) e vem para a posição normal.
+// Só mexe em intensidades e cores de materiais (nada é recompilado). Com ?perf e ?export a cena já nasce acesa e a câmera já fica na posição normal.
+const POWER_DARK = 0.05, ENV_DARK = 0.22, POWER_DIM = 0.2, POWER_EXPO = renderer.toneMappingExposure, POWER_SKIP = PERF || /export/.test(location.search);
+const INTRO = !POWER_SKIP, INTRO_OFF = V(0, 0.05, 0.20);
+let rgbPower = POWER_SKIP ? 1 : 0, powerT0 = 0, powerDone = POWER_SKIP;
+const power = (() => {
+  const amb = [], dev = [], lampMats = [], unlit = [], env = [], seen = new Set();
+  const skipM = new Set([screen.material, screenMatPlaceholder, ...rgbLeds.map(([m]) => m)]);
+  scene.traverse((o) => {
+    if (o.isLight && o !== lampLight && o !== glow && o !== focusLight) amb.push([o, o.intensity]);
+    if (!o.isMesh) return;
+    for (const m of (Array.isArray(o.material) ? o.material : [o.material])) {
+      if (!m || seen.has(m)) continue; seen.add(m);
+      if (m.emissive && m.emissiveIntensity > 0 && m.emissive.getHex() !== 0) dev.push([m, m.emissiveIntensity]);
+      if (m.isMeshStandardMaterial) env.push([m, m.envMapIntensity]);
+      // sem iluminação própria: quadros (com imagem e passando pelo tom) seguem a luz geral; visores, LEDs e fitas ligam com os aparelhos; a lâmpada do abajur (fff6e4) fica acesa
+      if (m.isMeshBasicMaterial && !skipM.has(m) && m.visible && m.opacity > 0 && m.color.getHex() !== 0 && m.color.getHex() !== 0xfff6e4) unlit.push([m, m.color.clone(), !!(m.map && m.toneMapped)]);
+    }
+  });
+  const scrM = MOBILE && screen.material.map ? [screen.material, screen.material.color.clone()] : null;   // no celular a tela do monitor mostra uma imagem do site: apagada até o monitor ligar
+  const lampBase = lampLight.intensity, li = dev.findIndex((d) => d[0].emissive.getHex() === 0xffa24a);
+  if (li >= 0) lampMats.push(dev.splice(li, 1)[0]);
+  const clamp = (x) => Math.max(0, Math.min(1, x));
+  // k = segundos desde que a pessoa começou (negativo = ainda sem energia)
+  return (k) => {
+    const ex = POWER_DIM + (1 - POWER_DIM) * ease(clamp((k - 0.15) / 1.3));   // exposição relativa: POWER_DIM -> 1
+    renderer.toneMappingExposure = POWER_EXPO * ex;
+    lampLight.intensity = lampBase / ex; lampMats.forEach(([m, b]) => { m.emissiveIntensity = b / ex; });
+    const a = POWER_DARK + (1 - POWER_DARK) * ease(clamp((k - 0.35) / 1.15));
+    amb.forEach(([l, b]) => { l.intensity = b * a; });
+    const e = ENV_DARK + (1 - ENV_DARK) * ease(clamp((k - 0.2) / 1.4));
+    env.forEach(([m, b]) => { m.envMapIntensity = b * e; });
+    unlit.forEach(([m, base, followsRoom], n) => { m.color.copy(base).multiplyScalar(followsRoom ? a : clamp((k - 1.1 - Math.min(0.9, n * 0.05)) / 0.25)); });
+    glow.intensity = GLOW_I * ease(clamp((k - 0.9) / 0.7));
+    if (scrM) scrM[0].color.copy(scrM[1]).multiplyScalar(ease(clamp((k - 0.9) / 0.7)));
+    dev.forEach(([m, b], n) => { m.emissiveIntensity = b * clamp((k - 1.1 - Math.min(0.9, n * 0.07)) / 0.25); });
+    rgbPower = clamp((k - 1.3) / 0.7);
+  };
+})();
+if (!POWER_SKIP) power(-1); else document.body.classList.add('lit');
+function entryPower(t) {
+  if (powerDone) return;
+  const v = window.__veil;
+  if (!v.started) return;
+  if (!powerT0) { powerT0 = t; if (INTRO) flyTo(HOME.pos.clone(), HOME.look.clone(), 1900); }   // a câmera vem da posição inicial (mais atrás e mais alta) para a normal
+  const k = (t - powerT0) / 1000;
+  if (k > 0.9) document.body.classList.add('lit');
+  power(Math.min(k, 3)); if (k >= 3) powerDone = true;
+}
 function frame(t) {
   const p0 = performance.now();
   if (first && perf) perf.first(p0);
@@ -2612,13 +2720,14 @@ function frame(t) {
     cam.look.set(orbit.c.x + Math.cos(orbit.az) * orbit.side, orbit.c.y - orbit.lift, orbit.c.z - Math.sin(orbit.az) * orbit.side);   // o objeto continua no terço esquerdo (no celular, centralizado e no alto)
   }
   if (homeDirty && !fly) { homeDirty = false; if (state.mode === 'desk') { cam.pos.copy(HOME.pos); cam.look.copy(HOME.look); } }   // a tela mudou de tamanho (ex.: girou o celular)
-  const par = state.mode === 'desk' && !fly ? 1 : 0;
+  if (INTRO && !window.__veil.started && state.mode === 'desk') { cam.pos.copy(HOME.pos).add(INTRO_OFF); cam.look.copy(HOME.look); }   // posição inicial: 20 cm mais atrás e 5 cm mais alta, até ligar a energia
+  const par = state.mode === 'desk' && !fly && window.__veil.started ? 1 : 0;   // antes de ligar a energia a câmera não segue o mouse: a cena tem que coincidir com o render escuro
   mouseS.lerp(new THREE.Vector2(mouseN.x * par, mouseN.y * par), Math.min(1, dt * 3));
   // computador: a câmera acompanha o mouse de leve; celular em pé: PAN, a câmera fica no lugar e gira para os lados acompanhando o dedo, varrendo toda a mesa (panMax = quanto da mesa fica além da tela)
   camera.position.copy(cam.pos).add(V(panMax ? 0 : mouseS.x * 0.055, -mouseS.y * 0.03, 0)); camera.lookAt(cam.look.x + mouseS.x * panMax, cam.look.y, cam.look.z);
   cssCamera.fov = camera.fov; cssCamera.aspect = camera.aspect; cssCamera.updateProjectionMatrix();
   cssCamera.position.copy(camera.position).multiplyScalar(K); cssCamera.quaternion.copy(camera.quaternion);
-  animate(dt, t); pulseTick(t); freeReadout();
+  animate(dt, t); pulseTick(t); freeReadout(); entryPower(t);
   renderer.render(scene, camera); cssRenderer.render(cssScene, cssCamera);
   if (perf) perf.tick(t, performance.now() - p0);
   if (tele) tele.tick(t);
