@@ -82,13 +82,13 @@ if (/perf/.test(location.search)) (function () {
   #vpower:focus-visible { outline: 2px solid var(--ink); outline-offset: 6px; }
   #vmsg { position: absolute; left: 0; right: 0; top: calc(50% + var(--rs) / 2 + 18px); margin: 0; text-align: center; font-size: 15px; font-weight: 500; color: var(--ink-60); transition: color .4s ease, opacity .25s ease; }
   #veil.ready #vmsg { color: #f6dc9a; }
-  .vsteps { position: absolute; left: 50%; bottom: calc(28px + env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(940px, 100% - 48px); margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
+  .vsteps { position: absolute; left: 50%; bottom: calc(28px + env(safe-area-inset-bottom)); transform: translateX(-50%); width: min(1240px, 100% - 48px); --fs: clamp(11px, calc((100vw - 104px) / 60), 20px); margin: 0; padding: 0; list-style: none; display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; }
   .vsteps li { display: flex; flex-direction: column; gap: 6px; padding-top: 12px; border-top: 1px solid var(--line); opacity: 0; transform: translateY(12px); animation: rise .7s cubic-bezier(.2,.7,.2,1) forwards; }
   .vsteps li:nth-child(2) { animation-delay: .12s; } .vsteps li:nth-child(3) { animation-delay: .24s; }
   .vsteps span { font-size: 13px; font-weight: 500; color: var(--ink-60); font-variant-numeric: tabular-nums; }
-  .vsteps b { font-size: 20px; line-height: 1.2; font-weight: 500; letter-spacing: -.03em; }
-  @media (max-aspect-ratio: 9/10), (max-width: 700px) { .vsteps { grid-template-columns: 1fr; gap: 0; bottom: calc(24px + env(safe-area-inset-bottom)); } .vsteps li { flex-direction: row; align-items: baseline; gap: 12px; padding: 10px 0; } .vsteps li:last-child { border-bottom: 1px solid var(--line); } .vsteps b { font-size: 16px; } }
-  @media (max-height: 460px) { #veil { --rs: 80px; } .vsteps { bottom: 12px; gap: 20px; } .vsteps li { padding-top: 8px; } .vsteps b { font-size: 15px; } #vmsg { font-size: 13px; top: calc(50% + var(--rs) / 2 + 12px); } }
+  .vsteps b { font-size: var(--fs); line-height: 1.2; font-weight: 500; letter-spacing: -.03em; white-space: nowrap; }   /* uma linha só por instrução: o tamanho (até 20px) encolhe com a largura da tela para a mais longa (português) caber na coluna */
+  @media (max-aspect-ratio: 9/10), (max-width: 700px) { .vsteps { grid-template-columns: 1fr; gap: 0; bottom: calc(24px + env(safe-area-inset-bottom)); } .vsteps li { flex-direction: row; align-items: baseline; gap: 12px; padding: 10px 0; } .vsteps li:last-child { border-bottom: 1px solid var(--line); } .vsteps b { font-size: 16px; white-space: normal; text-wrap: balance; } }
+  @media (max-height: 460px) { #veil { --rs: 80px; } .vsteps { bottom: 12px; gap: 20px; } .vsteps li { padding-top: 8px; } .vsteps b { font-size: min(15px, var(--fs)); } #vmsg { font-size: 13px; top: calc(50% + var(--rs) / 2 + 12px); } }
   @keyframes vpulse { 0%, 100% { opacity: .4; } 50% { opacity: 1; } }
   .vcorner { position: absolute; top: 10px; right: 16px; display: flex; flex-direction: column; align-items: flex-end; cursor: default; }
   #lang { display: flex; justify-content: center; align-items: center; gap: 6px; font-size: 14px; color: var(--ink-60); }
@@ -2681,7 +2681,7 @@ const FORM_URL = 'https://docs.google.com/forms/d/e/1FAIpQLSfKcIdjqxYpsDhVtjcAHu
 //   mesa    = 120 quadros com a cena acesa, câmera parada.
 // Se a pessoa liga a energia antes de as fases escondidas acabarem, elas são interrompidas (a linha diz "interrompido"). Se não liga em 40 s, envia o que tem.
 // Se a mediana da fase "normal" passa de 25 ms (LIMITE_LEVE, abaixo de 40 quadros/s) e a base mostra que o aparelho aguenta mais, o navegador guarda qualidade=leve para a próxima visita. BUILD marca a versão do site em toda linha.
-const BUILD = '2026-11-17';
+const BUILD = '2026-11-17b';
 const tele = (() => {
   if (PERF || /debug/.test(location.search) || location.protocol === 'file:' || /^(localhost|127\.0\.0\.1)$/.test(location.hostname)) return null;
   let visita = 1, revisita = false;
